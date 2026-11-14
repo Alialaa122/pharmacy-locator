@@ -320,13 +320,154 @@
 }
 
 
+.candidates-panel {
+  flex: 1;
+  min-width: 280px;
+  max-height: 600px;
+  overflow-y: auto;
+  padding: 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.candidates-panel h2 {
+  font-size: 14px;
+  margin: 0 0 8px;
+  color: #1e293b;
+}
+
+.recommend-button {
+  width: 100%;
+  background-color: #1e293b;
+  color: white;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.recommend-button:hover:not(:disabled) {
+  background-color: #0f172a;
+}
+
+.recommend-button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.candidates-note {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #94a3b8;
+  margin: 8px 0 12px;
+}
+
+.candidates-empty {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+  margin: 8px 0;
+}
+
+.candidate-card {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid #e5e7eb;
+  border-left-width: 4px;
+  border-radius: 8px;
+}
+
+.candidate-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.candidate-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.candidate-header h3 {
+  font-size: 14px;
+  margin: 0;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidate-kind {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0 0 6px;
+}
+
+.candidate-card p {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+  margin: 0 0 4px;
+}
+
+.candidate-card strong {
+  font-size: 12px;
+  color: #15803d;
+}
+
+.clear-recommendation {
+  width: 100%;
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 6px;
+  font-size: 12px;
+  color: #64748b;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.clear-recommendation:hover {
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+/* Map marker pin for recommended candidate spots */
+.candidate-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
 @media (max-width: 768px) {
   .map-layout {
     flex-direction: column;
   }
 
   .map-container,
-  .pharmacy-list {
+  .pharmacy-list,
+  .candidates-panel {
     width: 100%;
     box-sizing: border-box;
   }

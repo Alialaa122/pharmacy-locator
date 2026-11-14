@@ -10,9 +10,12 @@ import {
 import PharmacyList from "./PharmacyList.jsx";
 import GeographicAnalysis from "./GeographicAnalysis.jsx";
 import SearchPanel from "./components/SearchPanel.jsx";
+import CandidatesPanel from "./components/CandidatesPanel.jsx";
 import OsmLayer from "./components/map/OsmLayer.jsx";
 import CityMapMover from "./components/map/CityMapMover.jsx";
+import CandidateMarkers from "./components/map/CandidateMarkers.jsx";
 import { useGeographicFeatures } from "./hooks/useGeographicFeatures.js";
+import { useCandidateRecommendation } from "./hooks/useCandidateRecommendation.js";
 import { CATEGORIES } from "./lib/categories.js";
 import { DEFAULT_CITY } from "./lib/cities.js";
 import { formatDistance } from "./lib/format.js";
@@ -57,6 +60,14 @@ function App() {
     error: geographicError,
   } = useGeographicFeatures(selectedLocation, searchRadius);
 
+  const {
+    recommendation,
+    isLoading: isRecommending,
+    error: recommendError,
+    recommend,
+    clear: clearRecommendation,
+  } = useCandidateRecommendation(geographicFeatures, pharmacies);
+
   const geographicStats = CATEGORIES.filter(
     (category) => category.showInStats
   ).map((category) => ({
@@ -73,6 +84,7 @@ function App() {
     setPharmacies([]);
     setSelectedPharmacy(null);
     setHasSearched(false);
+    clearRecommendation();
   }
 
   function handleLocationSelect(location) {
@@ -157,6 +169,7 @@ function App() {
               onClick={() => setSelectedPharmacy(pharmacy)}
             />
         ))}
+          <CandidateMarkers recommendation={recommendation} />
         </GoogleMap>
         </div>
         <PharmacyList
@@ -165,6 +178,16 @@ function App() {
           searchRadius={searchRadius}
           hasSearched={hasSearched}
           onClearSearch={handleClearSearch}
+        />
+        <CandidatesPanel
+          canRecommend={
+            hasSearched && pharmacies.length > 0 && !geographicError
+          }
+          recommendation={recommendation}
+          isLoading={isRecommending}
+          error={recommendError}
+          onRecommend={recommend}
+          onClear={clearRecommendation}
         />
         <GeographicAnalysis
             stats={geographicStats}

@@ -195,7 +195,8 @@ Not tested now: React components, network calls.
   clear a **hard straight-line gate: ≥ 100 m from ALL pharmacies** (guarantees the EDA
   pass since walking ≥ straight-line). Sort margin-first, certify a top-10 budget with
   one Valhalla multi-source matrix, rank by walking separation descending, recommend
-  the top 3. **UI is a separate follow-up phase, never part of step 11.**
+  the top 3. Step 11 ships the pure logic plus a **minimal verification UI**
+  (button + panel + markers); a richer recommender UI is a follow-up.
 - **Order: refactor first, new features after** (city selector is the first feature post-refactor).
 
 **Implementation order (each step = one commit, following the AGENTS.md workflow loop):**
@@ -213,17 +214,19 @@ Not tested now: React components, network calls.
 11. Feature: candidate recommendation — pure logic (see §9 below).
 
 No open decisions remain for the agreed scope. Coordinate/zoom values of
-`lib/cities.js` are sanity-checked on first run. The recommender's UI
-(trigger, panel, markers) is deliberately deferred to a follow-up feature
-and is **not** part of step 11.
+`lib/cities.js` are sanity-checked on first run. The recommender ships
+with a minimal UI for verification (see §9); a rich recommender UI is
+a deliberate follow-up feature.
 
 ## 9. Candidate Recommendation (step 11: logic only — UI deferred)
 
 The recommender proposes **up to 3** spots where a new pharmacy would
 comply with the EDA rule. It is deterministic — no randomness, no AI.
-This step delivers **pure logic only** (domain + service layers, fully
-tested); the user-facing trigger, panel, and markers are a separate
-follow-up feature to be designed on its own.
+The pure logic (domain + service layers, fully tested) is the
+deliverable; a **minimal UI** (trigger button, panel, markers) is
+included in the same step for browser verification — see "UI"
+below. A richer recommender UI (filters, per-band counts, export)
+remains a follow-up feature.
 
 **Source of truth for the rule:** the recommender re-derives eligibility
 with the evaluator's primitives (`domain/eligibility.js`) against the full
@@ -267,6 +270,22 @@ this spot" measure rather than proximity.
 | No building/road data in radius | No sites generated; no recommendation (not an error). |
 | Valhalla failure | **Graceful degradation:** candidates are still ranked by straight-line separation and explicitly flagged `walkingVerified: false` — never presented as certified by walking distance. |
 | All sites fail the 100 m gate | Zero candidates: no compliant spots in this radius. |
+
+**UI (minimal, implemented in step 11 for verification):**
+- `hooks/useCandidateRecommendation` — owns the orchestration
+  (prefilter → Valhalla matrix → rank) and the request state.
+  A recommendation is invalidated by reference comparison against the
+  current pharmacy array, so any new search or "Clear Search"
+  invalidates it automatically (derived state, no effect).
+- `components/CandidatesPanel` — display-only: "Recommend locations"
+  button (enabled after a search found ≥ 1 pharmacy), the 3 ranked
+  cards (rank badge colored by band label, kind, band name if
+  walking-verified, separation with its basis, nearest competitor),
+  the empty "no compliant spots" message, and a clear button.
+- `components/map/CandidateMarkers` — numbered `AdvancedMarker`s
+  colored by band; all `@vis.gl` usage stays in `components/map/`.
+- `App.jsx` wires the hook + panel + markers; no SDK objects cross
+  into the panels (plain `recommendation` array down, callbacks up).
 
 **Accepted limitation:** candidates are OSM-derived centroids/midpoints —
 "this building / this stretch of road", best-effort, not a legal address
