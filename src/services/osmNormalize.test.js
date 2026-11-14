@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFile } from "node:fs/promises";
-import { normalizeOsmElements } from "./geographicService.js";
+import { normalizeOsmElements } from "./osmNormalize.js";
 
 // Characterization tests: these pin the CURRENT behavior of
 // normalizeOsmElements before any refactoring (roadmap step 2).

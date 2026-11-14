@@ -45,7 +45,6 @@ function App() {
   const [pharmacies, setPharmacies] = useState([]);
   const [selectedPharmacy, setSelectedPharmacy] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
-  const [selectedAddress, setSelectedAddress] = useState("");
   const [searchRadius, setSearchRadius] = useState(1000);
   const [hasSearched, setHasSearched] = useState(false);
 

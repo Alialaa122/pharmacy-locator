@@ -54,15 +54,6 @@ function PharmacySearch({
       setPharmacies(results);
       setHasSearched(true);
       setWalkingError(walkingUnavailable);
-
-      console.table(
-        results.map((pharmacy) => ({
-          id: pharmacy.id,
-          direct: pharmacy.directDistanceMeters,
-          walking: pharmacy.walkingDistanceMeters,
-          duration: pharmacy.walkingDurationSeconds,
-        }))
-      );
     } catch (searchError) {
       console.error(searchError);
       setError("Failed to search for pharmacies.");

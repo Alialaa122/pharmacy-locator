@@ -1,6 +1,5 @@
 
-import { readFile } from "node:fs/promises";
-import { normalizeOsmElements,isArea,getGeographicFeatures } from "./geographicService.js";
+import { getGeographicFeatures } from "./osmService.js";
 const features = await getGeographicFeatures(
   31.2001,
   29.9187,

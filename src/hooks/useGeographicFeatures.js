@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getGeographicFeatures } from "../services/geographicService.js";
+import { getGeographicFeatures } from "../services/osmService.js";
 
 /**
  * Loads OpenStreetMap features (via Overpass) for the selected location

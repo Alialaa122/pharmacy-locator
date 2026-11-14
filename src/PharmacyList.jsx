@@ -9,14 +9,7 @@ function PharmacyList({
   onClearSearch
 }) {
   const nearestPharmacy = pharmacies[0];
-console.table(
-  pharmacies.map((pharmacy) => ({
-    name: pharmacy.name,
-    direct: pharmacy.directDistanceMeters,
-    walking: pharmacy.walkingDistanceMeters,
-    duration: pharmacy.walkingDurationSeconds,
-  }))
-);
+
   return (
     <div className="pharmacy-list">
       <h2>Nearby Pharmacies</h2>
