@@ -38,7 +38,7 @@ console.table(
           <p>
             Nearest pharmacy (walking):{" "}
             {nearestPharmacy.walkingDistance != null
-              ? `${Math.round(nearestPharmacy.walkingDistance * 1000)} m`
+              ? `${Math.round(nearestPharmacy.walkingDistance)} m`
               : "Unavailable"}
           </p>
         )}
@@ -62,7 +62,7 @@ console.table(
             <p>
               <strong>Walking distance:</strong>{" "}
               {pharmacy.walkingDistance != null
-                ? `${Math.round(pharmacy.walkingDistance * 1000)} m`
+                ? `${Math.round(pharmacy.walkingDistance)} m`
                 : "Unavailable"}
             </p>
 
