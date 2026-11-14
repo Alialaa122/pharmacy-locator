@@ -9,10 +9,12 @@ import {
 } from "@vis.gl/react-google-maps";
 import PharmacyList from "./PharmacyList.jsx";
 import GeographicAnalysis from "./GeographicAnalysis.jsx";
-import PharmacySearch from "./components/PharmacySearch.jsx";
+import SearchPanel from "./components/SearchPanel.jsx";
 import OsmLayer from "./components/map/OsmLayer.jsx";
+import CityMapMover from "./components/map/CityMapMover.jsx";
 import { useGeographicFeatures } from "./hooks/useGeographicFeatures.js";
 import { CATEGORIES } from "./lib/categories.js";
+import { DEFAULT_CITY } from "./lib/cities.js";
 import { formatDistance } from "./lib/format.js";
 
 
@@ -45,6 +47,7 @@ function App() {
   const [pharmacies, setPharmacies] = useState([]);
   const [selectedPharmacy, setSelectedPharmacy] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [selectedCity, setSelectedCity] = useState(DEFAULT_CITY);
   const [searchRadius, setSearchRadius] = useState(1000);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -76,30 +79,32 @@ function App() {
     setSelectedLocation(location);
   }
 
+  function handleCitySelect(city) {
+    setSelectedCity(city);
+  }
+
   return (
     
     <APIProvider apiKey={apiKey}>
-      <label htmlFor="search-radius">Search Radius:</label>
-
-      <select
-          id="search-radius"
-          value={searchRadius}
-          onChange={(event) => setSearchRadius(Number(event.target.value))}
-      >
-          <option value={500}>500 m</option>
-          <option value={1000}>1 km</option>
-          <option value={2000}>2 km</option>
-          <option value={3000}>3 km</option>
-      </select>
+      <SearchPanel
+        selectedCity={selectedCity}
+        onCitySelect={handleCitySelect}
+        searchRadius={searchRadius}
+        setSearchRadius={setSearchRadius}
+        setPharmacies={setPharmacies}
+        selectedLocation={selectedLocation}
+        setHasSearched={setHasSearched}
+      />
 
       <div className="map-layout">
       <div className="map-container">
         <GoogleMap
           mapId="DEMO_MAP_ID"
-          defaultCenter={{ lat: 31.2001, lng: 29.9187 }}
-          defaultZoom={14}
+          defaultCenter={DEFAULT_CITY.center}
+          defaultZoom={DEFAULT_CITY.zoom}
           style={{ width: "100%", height: "600px" }}
         >
+          <CityMapMover selectedCity={selectedCity} />
           {selectedPharmacy && (
             <InfoWindow
               position={{
@@ -144,12 +149,6 @@ function App() {
                 }}
               />
           )}
-          <PharmacySearch setPharmacies={setPharmacies}
-                          selectedLocation={selectedLocation}
-                          searchRadius={searchRadius}
-                          setHasSearched={setHasSearched}
-
-          />
           {pharmacies.map((pharmacy) => (
             <AdvancedMarker
               key={pharmacy.id}
