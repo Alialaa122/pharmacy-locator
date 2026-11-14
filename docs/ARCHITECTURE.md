@@ -108,7 +108,7 @@ map click → selectedLocation → useGeographicFeatures(location, radius)
   + GeographicAnalysis stats (counts by category, computed from features — derived, not stored)
 ```
 
-## 5. City Selection and Map Behavior (agreed, not yet implemented — step 9)
+## 5. City Selection and Map Behavior (implemented — step 9)
 
 - `lib/cities.js` holds a static list; a dropdown selects. Agreed contents:
 
@@ -140,6 +140,9 @@ map click → selectedLocation → useGeographicFeatures(location, radius)
 | Routing API failure | **Graceful degradation:** results still shown with direct distances + a visible "walking distances unavailable" warning. The walking-distance feature fails; the system does not. |
 | Places search failure | Fail fast: error message, results cleared (nothing to degrade to). |
 | Overpass failure | Analysis panel shows error; map and pharmacy flow keep working. |
+| Location verdict — normal | `LocationVerdict` certifies a band from the nearest pharmacy's **walking** distance: `<100` Not eligible (EDA rule), `≤150` Potential, `≤250` Strong, `>250` Very strong. |
+| Location verdict — zero pharmacies | Gray **Unverified** with a reason; no distance is invented from absence of results. |
+| Location verdict — routing failure | Gray **Unverified**: the EDA measure is walking distance, and it is never guessed from straight-line (walking ≥ straight-line, so straight-line < 100 m proves nothing). |
 
 ## 7. Testing Strategy (smallest useful)
 
@@ -174,6 +177,17 @@ Not tested now: React components, network calls.
 - Pure `pharmacyResults.assemble` module. *Trade-off: one more file vs. hidden logic in a hook.*
 - Consistent search output regardless of result count (0/1/many).
 - Graceful degradation for routing failures.
+- **Eligibility evaluator** (`domain/eligibility.js`, `LocationVerdict`): the Egyptian Drug
+  Authority rule — a new pharmacy must be ≥ 100 m from any existing pharmacy, measured as
+  **walking distance** (user clarification; straight-line never substitutes for it). The
+  150/250 m bands are advisory, adopted from the PharmaLoc notebook. Verdict is
+  **Unverified** when no pharmacies are found or walking distances are unavailable. The
+  verdict is derived from the result list (no new state, no API calls). Geometric fact
+  the design relies on: walking ≥ straight-line, so straight-line ≥ 100 m guarantees the
+  gate passes — useful later for cheap candidate prefiltering in the recommender.
+- **Recommender direction:** a deterministic (non-AI) recommender will be built on top of
+  the evaluator as its own future feature; an LLM-assisted recommender is a longer-term
+  goal that would consume the evaluator's structured output — explicit non-goal for now.
 - **Order: refactor first, new features after** (city selector is the first feature post-refactor).
 
 **Implementation order (each step = one commit, following the AGENTS.md workflow loop):**

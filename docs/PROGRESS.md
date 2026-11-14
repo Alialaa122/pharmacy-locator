@@ -16,12 +16,14 @@
 | 7 | Category registry | ✅ Done | `b7b2a95` | `lib/categories.js`; query/classification/icons/stats registry-driven |
 | 8 | Cleanup pass | ✅ Done | `ed9cbde`, `34f72be` | service split (osmService/osmNormalize), logs + dead code removed, lint fully clean |
 | 9 | City selector feature | ✅ Done | `77bc1de` (feature/city-selector) | Alexandria/Cairo/Matrouh; CityMapMover; SearchPanel split |
+| 10 | Eligibility evaluator (EDA rule) | ✅ Done | `7881c7e` (feature/eligibility-evaluator) | `domain/eligibility.js` + `LocationVerdict`; walking-distance-based bands; Unverified semantics |
 
-**Tests: 38 passing** (6 files: osmNormalize, geo, format, pharmacyResults, categories, cities)
+**Tests: 50 passing** (7 files: osmNormalize, geo, format, pharmacyResults, categories, cities, eligibility)
 **Lint: completely clean** (as of step 8)
 
-Refactor steps 1–8 merged to main (`853bdd2`). Step 9 (city selector) lives
-on `feature/city-selector` pending browser verification + merge.
+Refactor steps 1–8 merged to main (`853bdd2`). Step 9 (city selector) merged
+to main (`007eaef`). Step 10 (eligibility evaluator) lives on
+`feature/eligibility-evaluator` pending browser verification + merge.
 
 ## Verification log
 
