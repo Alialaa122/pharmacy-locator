@@ -12,8 +12,8 @@
 | 3 | Routing service + component extraction | ✅ Done | `ce93359` | Valhalla isolated; `App.jsx` 439 → 278 lines |
 | 4 | Places mapping at the boundary | ✅ Done | `e1d2bf2` | Plain pharmacy data; assembler + tests; 3 agreed behavior changes |
 | 5 | Units + formatting | ✅ Done | `73064c9` | `lib/format.js`; `convertCoordinates` → `lib/geo.js` |
-| 6 | Geographic-analysis re-homing | ⬜ Next | — | `useGeographicFeatures` + `OsmLayer` |
-| 7 | Category registry | ⬜ Pending | — | |
+| 6 | Geographic-analysis re-homing | ✅ Done | `f62f4a6` | `useGeographicFeatures` hook + `OsmLayer`; `App.jsx` ~278 → 196 lines |
+| 7 | Category registry | ⬜ Next | — | |
 | 8 | Cleanup pass | ⬜ Pending | — | debug logs, unused state, doc refresh |
 | 9 | City selector feature | ⬜ Pending | — | first feature after refactor; Alexandria/Cairo/Matrouh |
 
