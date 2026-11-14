@@ -236,6 +236,50 @@
   border: 1px solid #e5e7eb;
 }
 
+.location-verdict {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.location-verdict h2 {
+  font-size: 14px;
+  margin: 0 0 8px;
+  color: #1e293b;
+}
+
+.verdict-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.location-verdict p {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+  margin: 8px 0 0;
+}
+
+.location-verdict strong {
+  color: #15803d;
+}
+
+.verdict-reason {
+  color: #94a3b8;
+}
+
+.location-verdict small {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 6px;
+}
+
 .pharmacy-card {
   padding: 10px 12px;
   margin-bottom: 8px;

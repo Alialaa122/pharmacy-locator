@@ -1,5 +1,6 @@
 
 import { formatDistance, formatDuration, formatRadius } from "./lib/format.js";
+import LocationVerdict from "./components/LocationVerdict.jsx";
 
 function PharmacyList({
   pharmacies,
@@ -12,6 +13,8 @@ function PharmacyList({
 
   return (
     <div className="pharmacy-list">
+      <LocationVerdict pharmacies={pharmacies} hasSearched={hasSearched} />
+
       <h2>Nearby Pharmacies</h2>
 
     {hasSearched && (
