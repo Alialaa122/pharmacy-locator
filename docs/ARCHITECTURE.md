@@ -1,9 +1,10 @@
 # Architecture — Pharmacy Locator
 
 > **Status:** prototype (`prototype-v1` tag). Client-only application: no backend, no database,
-> no server-side rendering. All refactoring steps 1–10 of the implementation plan are done
-> and merged to main (see `docs/IMPLEMENTATION_PLAN.md` / `docs/PROGRESS.md`); the
-> "Current Architecture" below describes the post-refactor state.
+> no server-side rendering. Steps 1–10 of the implementation plan are done and merged to main;
+> step 11 (candidate recommendation — pure logic) is in flight on
+> `feature/candidate-recommendation` (see `docs/PROGRESS.md`).
+> The "Current Architecture" below describes the post-refactor state.
 
 ## 1. Current Architecture (as implemented after the refactor)
 
@@ -31,7 +32,7 @@ with unit-suffixed field names; all display formatting lives in `lib/format.js`;
 lint is clean and the test suite pins normalizer, assembler, and formatter
 behavior.
 
-## 2. Target Architecture (agreed — steps 1–8 implemented; step 9 pending)
+## 2. Target Architecture (agreed — steps 1–10 implemented; step 11 in flight)
 
 ```
 UI components ──▶ hooks ──▶ domain (pure) ──▶ services ──▶ external APIs
@@ -41,7 +42,8 @@ UI components ──▶ hooks ──▶ domain (pure) ──▶ services ──�
 ```
 src/
 ├── lib/        geo.js · format.js · categories.js · cities.js
-├── domain/     pharmacyResults.js            (pure result assembly)
+├── domain/     pharmacyResults.js · candidates.js
+│                     (pure result assembly · pure recommendation ranking)
 ├── services/   placesService · routingService · osmService · osmNormalize
 ├── hooks/      useGeographicFeatures · usePharmacySearch
 ├── components/ map/(MapCanvas · OsmLayer · PharmacyMarkers)
@@ -187,6 +189,13 @@ Not tested now: React components, network calls.
 - **Recommender direction:** a deterministic (non-AI) recommender will be built on top of
   the evaluator as its own future feature; an LLM-assisted recommender is a longer-term
   goal that would consume the evaluator's structured output — explicit non-goal for now.
+- **Candidate recommender (step 11, agreed):** auto-generated candidates (Option B), not
+  user-picked points. Candidate sites = centroids of building polygons and midpoints of
+  road ways from the *existing* Overpass features (no extra fetch). Every candidate must
+  clear a **hard straight-line gate: ≥ 100 m from ALL pharmacies** (guarantees the EDA
+  pass since walking ≥ straight-line). Sort margin-first, certify a top-10 budget with
+  one Valhalla multi-source matrix, rank by walking separation descending, recommend
+  the top 3. **UI is a separate follow-up phase, never part of step 11.**
 - **Order: refactor first, new features after** (city selector is the first feature post-refactor).
 
 **Implementation order (each step = one commit, following the AGENTS.md workflow loop):**
@@ -200,6 +209,65 @@ Not tested now: React components, network calls.
 7. Category registry.
 8. Cleanup pass (dead code, debug logs, grid search deletion).
 9. Feature: city selector (Alexandria / Cairo / Matrouh).
+10. Feature: eligibility evaluator (`domain/eligibility.js`).
+11. Feature: candidate recommendation — pure logic (see §9 below).
 
-No open decisions remain. Coordinate/zoom values of `lib/cities.js` are sanity-checked on
-first run.
+No open decisions remain for the agreed scope. Coordinate/zoom values of
+`lib/cities.js` are sanity-checked on first run. The recommender's UI
+(trigger, panel, markers) is deliberately deferred to a follow-up feature
+and is **not** part of step 11.
+
+## 9. Candidate Recommendation (step 11: logic only — UI deferred)
+
+The recommender proposes **up to 3** spots where a new pharmacy would
+comply with the EDA rule. It is deterministic — no randomness, no AI.
+This step delivers **pure logic only** (domain + service layers, fully
+tested); the user-facing trigger, panel, and markers are a separate
+follow-up feature to be designed on its own.
+
+**Source of truth for the rule:** the recommender re-derives eligibility
+with the evaluator's primitives (`domain/eligibility.js`) against the full
+pharmacy list, rather than reading the verdict state — the verdict
+certifies the *clicked location*, while candidate ranking evaluates each
+candidate against *every* competitor. Same rule, different inputs.
+
+**Pipeline:**
+
+```
+features (existing Overpass fetch) + pharmacies (existing search results)
+  1. buildCandidateSites(features)              (pure)
+       building polygon → centroid; road LineString → midpoint
+       label = OSM name tag, else "Building" / "Road";
+       sites closer than 10 m are deduplicated (building wins ties)
+  2. prefilterCandidates(sites, pharmacies)     (pure)
+       HARD GATE: min STRAIGHT-LINE distance to ANY pharmacy >= 100 m
+       (guarantees the EDA pass by walking >= straight-line)
+       sort by that margin DOWN (most separated first), keep top 10
+  3. routingService.getWalkingMatrix(candidates, pharmacies)
+       one Valhalla POST (K sources x P targets);
+       getWalkingRoutes() becomes a wrapper — its contract is unchanged
+  4. rankCandidates(sites, matrix)               (pure)
+       per candidate: min WALKING distance to any pharmacy = separation;
+       band = classifySeparation() reused from eligibility.js;
+       sort: walkingVerified desc, separation desc;
+       walking-missing candidates keep their straight-line separation but
+       never sort ahead of certified ones; take top 3
+```
+
+**Ranking semantics:** *more separated from competitors = better spot* —
+consistent with the evaluator's bands, where margin is the "how good is
+this spot" measure rather than proximity.
+
+**Edge cases** (all pinned by step 11 tests):
+
+| Case | Expected behavior |
+|---|---|
+| Fewer compliant candidates than 3 | Recommend what exists (0–3). |
+| No pharmacies found | No recommendation — the compliance check is vacuous. |
+| No building/road data in radius | No sites generated; no recommendation (not an error). |
+| Valhalla failure | **Graceful degradation:** candidates are still ranked by straight-line separation and explicitly flagged `walkingVerified: false` — never presented as certified by walking distance. |
+| All sites fail the 100 m gate | Zero candidates: no compliant spots in this radius. |
+
+**Accepted limitation:** candidates are OSM-derived centroids/midpoints —
+"this building / this stretch of road", best-effort, not a legal address
+or door position.
