@@ -1,25 +1,38 @@
 # Architecture — Pharmacy Locator
 
 > **Status:** prototype (`prototype-v1` tag). Client-only application: no backend, no database,
-> no server-side rendering. This document distinguishes the **current implementation** from the
-> **agreed target architecture** for the planned refactor. Target items are **not yet implemented**.
+> no server-side rendering. Refactor progress: steps 1–8 of the implementation plan are done
+> (see `docs/IMPLEMENTATION_PLAN.md` / `docs/PROGRESS.md`); step 9 (city selector + the
+> `SearchPanel`/`MapCanvas`/`PharmacyMarkers` component split) is still pending, so the
+> "Current Architecture" below describes the post-refactor state with those exceptions.
 
-## 1. Current Architecture (as implemented)
+## 1. Current Architecture (as implemented after the refactor)
 
-- `App.jsx` (~440 lines) is the state container, layout, map composition, and network
-  orchestrator. It owns all shared state; children receive setters/callbacks as props.
-- Inline components inside `App.jsx`: `PharmacySearch` (Places search + inline Valhalla
-  `fetch` + sorting) and `MapClickHandler` (`useMap()` click listener).
-- Presentational panels: `PharmacyList`, `GeographicAnalysis` (pre-computed props).
-- Services: `pharmacyService.js` (Places search, haversine, Alexandria grid fallback) and
-  `geographicService.js` (Overpass fetch + OSM normalization — the strongest module).
-- Known problems (drivers of the refactor): god component; Google SDK objects
-  (`place.location.lat()`, `displayName.text`) leaking into the UI; integrations inline in
-  components; duplicated formatting and category knowledge; implicit units
-  (`distance` = meters, `walkingDistance` = km); side-effect `console.log`s; an unhandled
-  0–1-results branch that leaves stale results on screen.
+```
+App.jsx (~170 lines) — shared state (pharmacies, selectedPharmacy,
+  selectedLocation, searchRadius, hasSearched) + composition
+  ├─ PharmacySearch (components/)    — orchestrates the search pipeline
+  │     via placesService + routingService + domain/pharmacyResults
+  ├─ MapClickHandler (inline in App) — useMap() click listener
+  ├─ OsmLayer (components/map/)      — OSM overlays, dispatch by geometryType
+  ├─ inline overlays                 — InfoWindow, location marker, Circle,
+  │                                    pharmacy markers (move out in step 9)
+  ├─ PharmacyList                    — display only, formatted via lib/format
+  └─ GeographicAnalysis              — display only, registry-driven stats
 
-## 2. Target Architecture (agreed — not yet implemented)
+lib/        geo.js (haversine, coordinate conversion) · format.js ·
+            categories.js (data-only registry)
+domain/     pharmacyResults.js (pure assembler)
+services/   placesService · routingService · osmService · osmNormalize
+hooks/      useGeographicFeatures (Overpass fetch + request state)
+```
+
+Google SDK objects never cross service boundaries; units are meters/seconds
+with unit-suffixed field names; all display formatting lives in `lib/format.js`;
+lint is clean and the test suite pins normalizer, assembler, and formatter
+behavior.
+
+## 2. Target Architecture (agreed — steps 1–8 implemented; step 9 pending)
 
 ```
 UI components ──▶ hooks ──▶ domain (pure) ──▶ services ──▶ external APIs
@@ -95,7 +108,7 @@ map click → selectedLocation → useGeographicFeatures(location, radius)
   + GeographicAnalysis stats (counts by category, computed from features — derived, not stored)
 ```
 
-## 5. City Selection and Map Behavior (agreed, not yet implemented)
+## 5. City Selection and Map Behavior (agreed, not yet implemented — step 9)
 
 - `lib/cities.js` holds a static list; a dropdown selects. Agreed contents:
 
@@ -118,15 +131,15 @@ map click → selectedLocation → useGeographicFeatures(location, radius)
 
 ## 6. Edge Cases (expected behavior)
 
-| Case | Expected behavior |
+| Case | Expected behavior (implemented as of step 4) |
 |---|---|
-| Zero pharmacies | `hasSearched=true`, empty-state message, no pharmacy markers, previous results cleared. (Today's code skips `setPharmacies` here — the pipeline fixes it as a side effect.) |
-| One pharmacy | Treated as a completely normal result: full pipeline runs — list entry, marker, InfoWindow, and walking distance requested (a 1-target matrix is valid). **Agreed behavior change** from today's stale-list behavior. |
+| Zero pharmacies | `hasSearched=true`, empty-state message, no pharmacy markers, previous results cleared. |
+| One pharmacy | Treated as a completely normal result: full pipeline runs — list entry, marker, InfoWindow, and walking distance requested (a 1-target matrix is valid). **Agreed behavior change** from the prototype's stale-list behavior. |
 | Multiple | Sorted by walking distance ascending; missing-walking entries last. List click and marker click select the same item. |
 | Missing walking route | Pharmacy keeps direct distance; `walkingDistanceMeters: null`; UI shows "Unavailable"; sorts last. |
-| Routing API failure | **Graceful degradation (agreed):** results still shown with direct distances + a visible "walking distances unavailable" warning. The walking-distance feature fails; the system does not. (Today it fails the whole search.) |
+| Routing API failure | **Graceful degradation:** results still shown with direct distances + a visible "walking distances unavailable" warning. The walking-distance feature fails; the system does not. |
 | Places search failure | Fail fast: error message, results cleared (nothing to degrade to). |
-| Overpass failure | Analysis panel shows error; map and pharmacy flow keep working (current behavior, preserved). |
+| Overpass failure | Analysis panel shows error; map and pharmacy flow keep working. |
 
 ## 7. Testing Strategy (smallest useful)
 
