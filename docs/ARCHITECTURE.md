@@ -1,10 +1,9 @@
 # Architecture — Pharmacy Locator
 
 > **Status:** prototype (`prototype-v1` tag). Client-only application: no backend, no database,
-> no server-side rendering. Refactor progress: steps 1–8 of the implementation plan are done
-> (see `docs/IMPLEMENTATION_PLAN.md` / `docs/PROGRESS.md`); step 9 (city selector + the
-> `SearchPanel`/`MapCanvas`/`PharmacyMarkers` component split) is still pending, so the
-> "Current Architecture" below describes the post-refactor state with those exceptions.
+> no server-side rendering. All refactoring steps 1–10 of the implementation plan are done
+> and merged to main (see `docs/IMPLEMENTATION_PLAN.md` / `docs/PROGRESS.md`); the
+> "Current Architecture" below describes the post-refactor state.
 
 ## 1. Current Architecture (as implemented after the refactor)
 

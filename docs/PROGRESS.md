@@ -22,8 +22,7 @@
 **Lint: completely clean** (as of step 8)
 
 Refactor steps 1–8 merged to main (`853bdd2`). Step 9 (city selector) merged
-to main (`007eaef`). Step 10 (eligibility evaluator) lives on
-`feature/eligibility-evaluator` pending browser verification + merge.
+to main (`007eaef`). Step 10 (eligibility evaluator) merged to main (`6acbd22`).
 
 ## Verification log
 
@@ -31,6 +30,10 @@ to main (`007eaef`). Step 10 (eligibility evaluator) lives on
   distances, list, markers, InfoWindow all render correctly).
 - **Steps 1–5:** `npm run lint`, `npm test`, `npm run build` green at each
   commit. Lint warnings remaining are pre-existing (tracked in step 8).
+- **Step 10:** browser check confirmed by the user (verdict card renders the
+  correct band with nearest competitor, walking separation, and
+  straight-line distance; zero-result and unavailable-routing cases show the
+  gray Unverified badge with a reason). Merged to main (`6acbd22`).
 
 ## Behavior changes so far (all agreed, documented in ARCHITECTURE.md §6/§8)
 
