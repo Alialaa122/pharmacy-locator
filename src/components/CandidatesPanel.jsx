@@ -9,8 +9,10 @@ import { formatDistance } from "../lib/format.js";
  *   recommendation: Array | null, // null = not run; [] = ran, none eligible
  *   isLoading: boolean,
  *   error: string,
+ *   selectedCandidateIndex: number | null,
  *   onRecommend: () => void,
  *   onClear: () => void,
+ *   onSelectCandidate: (index: number) => void,
  * }} props
  */
 function CandidatesPanel({
@@ -18,8 +20,10 @@ function CandidatesPanel({
   recommendation,
   isLoading,
   error,
+  selectedCandidateIndex,
   onRecommend,
   onClear,
+  onSelectCandidate,
 }) {
   const hasRun = recommendation !== null;
 
@@ -37,7 +41,7 @@ function CandidatesPanel({
 
       <p className="candidates-note">
         Spots at least 100 m (straight-line) from every found pharmacy,
-        ranked by walking separation.
+        ranked by walking separation. Click a spot to see its details.
       </p>
 
       {error && <p className="error-message">{error}</p>}
@@ -51,8 +55,13 @@ function CandidatesPanel({
 
       {recommendation?.map((candidate, index) => (
         <div
-          className="candidate-card"
+          className={
+            index === selectedCandidateIndex
+              ? "candidate-card candidate-selected"
+              : "candidate-card"
+          }
           key={`${candidate.id}-${index}`}
+          onClick={() => onSelectCandidate(index)}
           style={{
             borderLeftColor: candidate.band?.color ?? "#e5e7eb",
           }}

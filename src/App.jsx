@@ -53,6 +53,15 @@ function App() {
   const [selectedCity, setSelectedCity] = useState(DEFAULT_CITY);
   const [searchRadius, setSearchRadius] = useState(1000);
   const [hasSearched, setHasSearched] = useState(false);
+  // { forRecommendation, index } — bound to the exact recommendation
+  // array it came from, so a new search / new recommendation (a new
+  // array reference) invalidates the selection automatically — no
+  // stale InfoWindow, no effect (derived state, as in the hook).
+  const [candidateSelection, setCandidateSelection] = useState(null);
+  const selectedCandidateIndex =
+    candidateSelection && candidateSelection.forRecommendation === recommendation
+      ? candidateSelection.index
+      : null;
 
   const {
     features: geographicFeatures,
@@ -80,10 +89,33 @@ function App() {
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
+  // A selected candidate is an index into the CURRENT recommendation.
+  // A new search / clear invalidates the recommendation (reference
+  // mismatch), so it also invalidates this selection — no stale window.
+  const selectedCandidate =
+    recommendation && selectedCandidateIndex !== null
+      ? recommendation[selectedCandidateIndex]
+      : null;
+
   function handleClearSearch() {
     setPharmacies([]);
     setSelectedPharmacy(null);
     setHasSearched(false);
+    setCandidateSelection(null);
+    clearRecommendation();
+  }
+
+  function handleSelectCandidate(index) {
+    setSelectedPharmacy(null); // one info-window at a time
+    setCandidateSelection({ forRecommendation: recommendation, index });
+  }
+
+  function handleCloseCandidate() {
+    setCandidateSelection(null);
+  }
+
+  function handleClearRecommendation() {
+    setCandidateSelection(null);
     clearRecommendation();
   }
 
@@ -117,7 +149,7 @@ function App() {
           style={{ width: "100%", height: "600px" }}
         >
           <CityMapMover selectedCity={selectedCity} />
-          {selectedPharmacy && (
+          {selectedPharmacy && !selectedCandidate && (
             <InfoWindow
               position={{
                 lat: selectedPharmacy.lat,
@@ -169,7 +201,57 @@ function App() {
               onClick={() => setSelectedPharmacy(pharmacy)}
             />
         ))}
-          <CandidateMarkers recommendation={recommendation} />
+          {selectedCandidate && (
+            <InfoWindow
+              position={{
+                lat: selectedCandidate.lat,
+                lng: selectedCandidate.lng,
+              }}
+              onCloseClick={handleCloseCandidate}
+            >
+              <div className="candidate-window">
+                <h3>
+                  {recommendation.indexOf(selectedCandidate) + 1}.{" "}
+                  {selectedCandidate.label}
+                </h3>
+                <p>
+                  <strong>
+                    {selectedCandidate.kind === "building"
+                      ? "Building"
+                      : "Road"}
+                    {selectedCandidate.walkingVerified &&
+                    selectedCandidate.band
+                      ? ` · ${selectedCandidate.band.label}`
+                      : selectedCandidate.walkingVerified
+                        ? ""
+                        : " · walking unverified"}
+                  </strong>
+                </p>
+                <p>
+                  {selectedCandidate.separationBasis === "walking"
+                    ? "Separation (walking):"
+                    : "Separation (straight-line):"}{" "}
+                  {formatDistance(selectedCandidate.separationMeters)}
+                </p>
+                {selectedCandidate.walkingVerified &&
+                  selectedCandidate.nearestCompetition && (
+                    <p>
+                      Nearest competitor:{" "}
+                      {selectedCandidate.nearestCompetition.name}
+                    </p>
+                  )}
+                <small>
+                  {selectedCandidate.lat.toFixed(5)},{" "}
+                  {selectedCandidate.lng.toFixed(5)}
+                </small>
+              </div>
+            </InfoWindow>
+          )}
+          <CandidateMarkers
+            recommendation={recommendation}
+            selectedCandidateIndex={selectedCandidateIndex}
+            onSelectCandidate={handleSelectCandidate}
+          />
         </GoogleMap>
         </div>
         <PharmacyList
@@ -186,8 +268,10 @@ function App() {
           recommendation={recommendation}
           isLoading={isRecommending}
           error={recommendError}
+          selectedCandidateIndex={selectedCandidateIndex}
           onRecommend={recommend}
-          onClear={clearRecommendation}
+          onClear={handleClearRecommendation}
+          onSelectCandidate={handleSelectCandidate}
         />
         <GeographicAnalysis
             stats={geographicStats}

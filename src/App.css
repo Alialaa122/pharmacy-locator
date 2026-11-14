@@ -379,6 +379,43 @@
   border: 1px solid #e5e7eb;
   border-left-width: 4px;
   border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.candidate-card:hover {
+  background: #f8fafc;
+}
+
+.candidate-card.candidate-selected {
+  background: #f1f5f9;
+  box-shadow: 0 0 0 2px rgba(30, 41, 59, 0.25);
+}
+
+/* Content of the candidate InfoWindow */
+.candidate-window h3 {
+  font-size: 14px;
+  margin: 0 0 6px;
+  color: #1e293b;
+  max-width: 220px;
+}
+
+.candidate-window p {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+  margin: 0 0 4px;
+}
+
+.candidate-window strong {
+  color: #15803d;
+}
+
+.candidate-window small {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 4px;
 }
 
 .candidate-header {
@@ -458,6 +495,19 @@
   font-weight: 700;
   border: 2px solid #ffffff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.candidate-marker:hover {
+  transform: scale(1.12);
+}
+
+.candidate-marker.candidate-selected {
+  width: 30px;
+  height: 30px;
+  transform: scale(1.12);
+  box-shadow: 0 0 0 3px rgba(30, 41, 59, 0.4), 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
 @media (max-width: 768px) {
