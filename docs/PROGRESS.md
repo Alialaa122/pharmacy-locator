@@ -15,10 +15,13 @@
 | 6 | Geographic-analysis re-homing | ✅ Done | `f62f4a6` | `useGeographicFeatures` hook + `OsmLayer`; `App.jsx` ~278 → 196 lines |
 | 7 | Category registry | ✅ Done | `b7b2a95` | `lib/categories.js`; query/classification/icons/stats registry-driven |
 | 8 | Cleanup pass | ✅ Done | `ed9cbde`, `34f72be` | service split (osmService/osmNormalize), logs + dead code removed, lint fully clean |
-| 9 | City selector feature | ⬜ Next | — | first feature after refactor; Alexandria/Cairo/Matrouh |
+| 9 | City selector feature | ✅ Done | `77bc1de` (feature/city-selector) | Alexandria/Cairo/Matrouh; CityMapMover; SearchPanel split |
 
-**Tests: 35 passing** (5 files: osmNormalize, geo, format, pharmacyResults, categories)
+**Tests: 38 passing** (6 files: osmNormalize, geo, format, pharmacyResults, categories, cities)
 **Lint: completely clean** (as of step 8)
+
+Refactor steps 1–8 merged to main (`853bdd2`). Step 9 (city selector) lives
+on `feature/city-selector` pending browser verification + merge.
 
 ## Verification log
 
