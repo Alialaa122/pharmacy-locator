@@ -13,6 +13,9 @@ dist-ssr
 *.local
 .env
 
+# Harness config
+opencode.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
