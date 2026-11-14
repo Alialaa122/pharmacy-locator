@@ -19,14 +19,20 @@
 | 10 | Eligibility evaluator (EDA rule) | ✅ Done | `7881c7e` merged `6acbd22` | `domain/eligibility.js` + `LocationVerdict`; walking-distance-based bands; Unverified semantics |
 | 11 | Candidate recommendation (logic only) | 🔧 In progress | — (feature/candidate-recommendation) | auto candidates (building centroids + road midpoints), 100 m straight-line hard gate, top-10 Valhalla certification, top-3 ranking; UI deferred |
 
-**Tests: 50 passing** (7 files: osmNormalize, geo, format, pharmacyResults, categories, cities, eligibility)
+**Tests: 77 passing** (8 files: osmNormalize, geo, format, pharmacyResults, categories, cities, eligibility, candidates)
 **Lint: completely clean** (as of step 8)
 
 Refactor steps 1–8 merged to main (`853bdd2`). Step 9 (city selector) merged
 to main (`007eaef`). Step 10 (eligibility evaluator) merged to main (`6acbd22`).
-Step 11 in progress on `feature/candidate-recommendation`: commits are
-(1) docs spec, (2) `routingService.getWalkingMatrix`, (3) `domain/candidates.js`
-+ geometry helpers + tests.
+Step 11 in progress on `feature/candidate-recommendation`:
+- Docs spec — committed (`322f5c1`).
+- `routingService.getWalkingMatrix` — committed (`9330fb5`);
+  `getWalkingRoutes` is now a thin wrapper, its contract unchanged.
+- `lib/geo.js` centroid/midpoint helpers — committed (`36d7c99`).
+- `domain/candidates.js` + tests — committed (see below).
+  Every §9 edge case is pinned by tests (8 test files, 77 tests).
+- **Next:** recommender UI (trigger + panel + markers) is a separate
+  follow-up feature to be planned; logic is complete and tested.
 
 ## Verification log
 
