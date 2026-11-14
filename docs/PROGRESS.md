@@ -13,11 +13,11 @@
 | 4 | Places mapping at the boundary | ✅ Done | `e1d2bf2` | Plain pharmacy data; assembler + tests; 3 agreed behavior changes |
 | 5 | Units + formatting | ✅ Done | `73064c9` | `lib/format.js`; `convertCoordinates` → `lib/geo.js` |
 | 6 | Geographic-analysis re-homing | ✅ Done | `f62f4a6` | `useGeographicFeatures` hook + `OsmLayer`; `App.jsx` ~278 → 196 lines |
-| 7 | Category registry | ⬜ Next | — | |
-| 8 | Cleanup pass | ⬜ Pending | — | debug logs, unused state, doc refresh |
+| 7 | Category registry | ✅ Done | `b7b2a95` | `lib/categories.js`; query/classification/icons/stats registry-driven |
+| 8 | Cleanup pass | ⬜ Next | — | debug logs, unused state, service rename, doc refresh |
 | 9 | City selector feature | ⬜ Pending | — | first feature after refactor; Alexandria/Cairo/Matrouh |
 
-**Tests: 29 passing** (4 files: osmNormalize, geo, format, pharmacyResults)
+**Tests: 35 passing** (5 files: osmNormalize, geo, format, pharmacyResults, categories)
 
 ## Verification log
 
