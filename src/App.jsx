@@ -5,15 +5,13 @@ import {
   AdvancedMarker,
   InfoWindow,
   useMap,
-  Circle,
-  Polygon,
-  Polyline
+  Circle
 } from "@vis.gl/react-google-maps";
 import PharmacyList from "./PharmacyList.jsx";
-import { getGeographicFeatures } from "./services/geographicService.js";
 import GeographicAnalysis from "./GeographicAnalysis.jsx";
 import PharmacySearch from "./components/PharmacySearch.jsx";
-import { convertCoordinates } from "./lib/geo.js";
+import OsmLayer from "./components/map/OsmLayer.jsx";
+import { useGeographicFeatures } from "./hooks/useGeographicFeatures.js";
 import { formatDistance } from "./lib/format.js";
 
 
@@ -49,47 +47,38 @@ function App() {
   const [selectedAddress, setSelectedAddress] = useState("");
   const [searchRadius, setSearchRadius] = useState(1000);
   const [hasSearched, setHasSearched] = useState(false);
-  const [geographicFeatures, setGeographicFeatures] = useState([]);
-  const [isGeographicLoading, setIsGeographicLoading] = useState(false);
-  const [geographicError, setGeographicError] = useState("");
+
+  const {
+    features: geographicFeatures,
+    isLoading: isGeographicLoading,
+    error: geographicError,
+  } = useGeographicFeatures(selectedLocation, searchRadius);
+
   const geographicStats = {
-  buildings: geographicFeatures.filter(
-    (feature) => feature.category === "building"
-  ).length,
+    buildings: geographicFeatures.filter(
+      (feature) => feature.category === "building"
+    ).length,
 
-  roads: geographicFeatures.filter(
-    (feature) => feature.category === "road"
-  ).length,
+    roads: geographicFeatures.filter(
+      (feature) => feature.category === "road"
+    ).length,
 
-  schools: geographicFeatures.filter(
-    (feature) => feature.category === "school"
-  ).length,
+    schools: geographicFeatures.filter(
+      (feature) => feature.category === "school"
+    ).length,
 
-  hospitals: geographicFeatures.filter(
-    (feature) => feature.category === "hospital"
-  ).length,
+    hospitals: geographicFeatures.filter(
+      (feature) => feature.category === "hospital"
+    ).length,
 
-  atms: geographicFeatures.filter(
-    (feature) => feature.category === "atm"
-  ).length,
+    atms: geographicFeatures.filter(
+      (feature) => feature.category === "atm"
+    ).length,
 
-  busStops: geographicFeatures.filter(
-    (feature) => feature.category === "bus_stop"
-  ).length,
-};
-  const polygonFeatures = geographicFeatures.filter(
-      (feature) =>
-        feature.geometryType === "Polygon" &&
-        ["building", "landuse", "amenity"].includes(feature.category)
-  );
-  const roadFeatures = geographicFeatures.filter(
-  (feature) => feature.category === "road"
-  );
-  const pointFeatures = geographicFeatures.filter(
-  (feature) => feature.geometryType === "Point"
-  );
-  console.log("Point features:", pointFeatures.length);
-  console.log("First point:", pointFeatures[0]);
+    busStops: geographicFeatures.filter(
+      (feature) => feature.category === "bus_stop"
+    ).length,
+  };
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -102,31 +91,6 @@ function App() {
   function handleLocationSelect(location) {
     setSelectedLocation(location);
   }
-
-  useEffect(() => {
-    if (!selectedLocation) return;
-
-    async function loadGeographicFeatures() {
-      setIsGeographicLoading(true);
-      setGeographicError("");
-
-      try {
-        const features = await getGeographicFeatures(
-          selectedLocation.lat,
-          selectedLocation.lng,
-          searchRadius
-        );
-
-        setGeographicFeatures(features);
-      } catch (error) {
-        setGeographicError("Failed to load geographic data.");
-      } finally {
-        setIsGeographicLoading(false);
-      }
-    }
-
-    loadGeographicFeatures();
-  }, [selectedLocation, searchRadius]);
 
   return (
     
@@ -174,50 +138,7 @@ function App() {
             </InfoWindow>
           )}
           <MapClickHandler onLocationSelect={handleLocationSelect} />
-          {polygonFeatures.map((feature) => (
-          <Polygon
-            key={feature.id}
-            paths={convertCoordinates(feature.coordinates[0])}
-            options={{
-              fillColor: "#3b82f6",
-              fillOpacity: 0.2,
-              strokeColor: "#2563eb",
-              strokeOpacity: 0.8,
-              strokeWeight: 1,
-            }}
-          />
-          ))}
-          {roadFeatures.map((feature) => (
-          <Polyline
-              key={feature.id}
-              path={convertCoordinates(feature.coordinates)}
-              options={{
-                strokeColor: "#f97316",
-                strokeOpacity: 0.8,
-                strokeWeight: 2,
-              }}
-            />
-          ))}
-          {pointFeatures.map((feature) => (
-            <AdvancedMarker
-              key={feature.id}
-              position={{
-                lat: feature.coordinates[1],
-                lng: feature.coordinates[0],
-              }}
-              title={feature.name || feature.category}
-            >
-              <div className="geographic-marker">
-                {{
-                  hospital: "🏥",
-                  school: "🏫",
-                  atm: "🏧",
-                  bus_stop: "🚌",
-                  pharmacy: "💊",
-                }[feature.category] || "📍"}
-              </div>
-            </AdvancedMarker>
-          ))}
+          <OsmLayer features={geographicFeatures} />
 
           {selectedLocation && (
             <AdvancedMarker position={selectedLocation}>
