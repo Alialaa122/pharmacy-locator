@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { calculateDistance } from "./pharmacyService.js";
+import { calculateDistance } from "./geo.js";
 
 // Characterization test for the haversine implementation.
-// Its main job right now is to ANCHOR THE UNIT (meters) before the
-// refactoring renames distance fields (roadmap step 5).
+// Its main job is to ANCHOR THE UNIT (meters).
 
 describe("calculateDistance", () => {
   it("returns 0 for identical points", () => {

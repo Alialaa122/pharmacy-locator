@@ -9,10 +9,10 @@ function PharmacyList({
   const nearestPharmacy = pharmacies[0];
 console.table(
   pharmacies.map((pharmacy) => ({
-    name: pharmacy.displayName?.text,
-    distance: pharmacy.distance,
-    walkingDistance: pharmacy.walkingDistance,
-    walkingDuration: pharmacy.walkingDuration,
+    name: pharmacy.name,
+    direct: pharmacy.directDistanceMeters,
+    walking: pharmacy.walkingDistanceMeters,
+    duration: pharmacy.walkingDurationSeconds,
   }))
 );
   return (
@@ -37,8 +37,8 @@ console.table(
         {nearestPharmacy && (
           <p>
             Nearest pharmacy (walking):{" "}
-            {nearestPharmacy.walkingDistance != null
-              ? `${Math.round(nearestPharmacy.walkingDistance)} m`
+            {nearestPharmacy.walkingDistanceMeters != null
+              ? `${Math.round(nearestPharmacy.walkingDistanceMeters)} m`
               : "Unavailable"}
           </p>
         )}
@@ -54,28 +54,28 @@ console.table(
           className="pharmacy-card"
           onClick={() => onSelectPharmacy(pharmacy)}
         >
-          <h3>{pharmacy.displayName?.text}</h3>
+          <h3>{pharmacy.name}</h3>
 
-          <p>{pharmacy.formattedAddress}</p>
+          <p>{pharmacy.address}</p>
 
           <div className="pharmacy-distances">
             <p>
               <strong>Walking distance:</strong>{" "}
-              {pharmacy.walkingDistance != null
-                ? `${Math.round(pharmacy.walkingDistance)} m`
+              {pharmacy.walkingDistanceMeters != null
+                ? `${Math.round(pharmacy.walkingDistanceMeters)} m`
                 : "Unavailable"}
             </p>
 
             <p>
               <strong>Walking duration:</strong>{" "}
-              {pharmacy.walkingDuration != null
-                ? `${Math.ceil(pharmacy.walkingDuration / 60)} min`
+              {pharmacy.walkingDurationSeconds != null
+                ? `${Math.ceil(pharmacy.walkingDurationSeconds / 60)} min`
                 : "Unavailable"}
             </p>
 
             <p>
               <strong>Direct distance:</strong>{" "}
-              {Math.round(pharmacy.distance)} m
+              {Math.round(pharmacy.directDistanceMeters)} m
             </p>
           </div>
         </div>

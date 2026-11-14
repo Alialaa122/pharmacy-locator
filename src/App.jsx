@@ -158,15 +158,18 @@ function App() {
         >
           {selectedPharmacy && (
             <InfoWindow
-              position={selectedPharmacy.coordinates}
+              position={{
+                lat: selectedPharmacy.lat,
+                lng: selectedPharmacy.lng,
+              }}
               onCloseClick={() => setSelectedPharmacy(null)}
             >
               <div>
-                <h3>{selectedPharmacy.displayName?.text}</h3>
-                <p>{selectedPharmacy.formattedAddress}</p>
+                <h3>{selectedPharmacy.name}</h3>
+                <p>{selectedPharmacy.address}</p>
                 <p>
                   Direct distance:{" "}
-                  {Math.round(selectedPharmacy.distance).toLocaleString("en-US")} m
+                  {Math.round(selectedPharmacy.directDistanceMeters).toLocaleString("en-US")} m
                 </p>
                 <small>
                   Measured in a straight line, not walking or driving distance.
@@ -249,8 +252,8 @@ function App() {
           {pharmacies.map((pharmacy) => (
             <AdvancedMarker
               key={pharmacy.id}
-              position={pharmacy.coordinates}
-              title={pharmacy.displayName?.text}
+              position={{ lat: pharmacy.lat, lng: pharmacy.lng }}
+              title={pharmacy.name}
               onClick={() => setSelectedPharmacy(pharmacy)}
             />
         ))}

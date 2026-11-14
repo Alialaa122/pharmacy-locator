@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { useMapsLibrary } from "@vis.gl/react-google-maps";
-import {
-  searchGooglePharmacies,
-  calculateDistance,
-} from "../services/pharmacyService.js";
+import { searchPharmacies } from "../services/placesService.js";
 import { getWalkingRoutes } from "../services/routingService.js";
+import { assemblePharmacyResults } from "../domain/pharmacyResults.js";
 
 function PharmacySearch({
   setPharmacies,
@@ -16,92 +14,59 @@ function PharmacySearch({
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [walkingError, setWalkingError] = useState(false);
 
   async function handleSearch() {
     setIsLoading(true);
     setError("");
+    setWalkingError(false);
 
     try {
-      const places = await searchGooglePharmacies(
+      const pharmacies = await searchPharmacies(
         placesLibrary,
         selectedLocation,
         searchRadius
       );
 
-      let pharmaciesWithDistance = await Promise.all(
-        places.map(async (pharmacy) => {
-          const distance = calculateDistance(
-            selectedLocation,
-            {
-              lat: pharmacy.location.lat(),
-              lng: pharmacy.location.lng(),
-            }
-          );
+      // Agreed: routing failures degrade gracefully — results keep their
+      // direct distances and the UI shows a warning (see ARCHITECTURE.md §6).
+      let walkingRoutes = [];
+      let walkingUnavailable = false;
 
-          return {
-            ...pharmacy,
-            distance,
-            walkingDistance: null,
-            walkingDuration: null,
-            location: pharmacy.location,
-            displayName: pharmacy.displayName,
-            formattedAddress: pharmacy.formattedAddress,
-          };
-        })
+      if (pharmacies.length > 0) {
+        try {
+          walkingRoutes = await getWalkingRoutes(
+            selectedLocation,
+            pharmacies
+          );
+        } catch (routingError) {
+          console.error(routingError);
+          walkingUnavailable = true;
+        }
+      }
+
+      const results = assemblePharmacyResults(
+        pharmacies,
+        selectedLocation,
+        walkingRoutes
       );
 
-      if (places.length >= 2) {
-        const targets = places.map((pharmacy) => ({
-          lat: pharmacy.location.lat(),
-          lng: pharmacy.location.lng(),
-        }));
-
-        const walkingRoutes = await getWalkingRoutes(
-          selectedLocation,
-          targets
-        );
-
-        console.log("Walking routes:", walkingRoutes);
-
-        pharmaciesWithDistance = places.map((pharmacy, index) => {
-          const lat = pharmacy.location.lat();
-          const lng = pharmacy.location.lng();
-          const route = walkingRoutes[index];
-
-          return {
-            ...pharmacy,
-            distance: calculateDistance(selectedLocation, {
-              lat,
-              lng,
-            }),
-            walkingDistance: route ? route.distanceMeters : null,
-            walkingDuration: route ? route.durationSeconds : null,
-            coordinates: { lat, lng },
-          };
-        });
-
-        pharmaciesWithDistance.sort((a, b) => {
-          if (a.walkingDistance === null) return 1;
-          if (b.walkingDistance === null) return -1;
-
-          return a.walkingDistance - b.walkingDistance;
-        });
-
-        setPharmacies(pharmaciesWithDistance);
-        console.table(
-          pharmaciesWithDistance.map((pharmacy) => ({
-            id: pharmacy.id,
-            coordinates: pharmacy.coordinates,
-            walkingDistance: pharmacy.walkingDistance,
-            walkingDuration: pharmacy.walkingDuration,
-          }))
-        );
-      }
+      setPharmacies(results);
       setHasSearched(true);
+      setWalkingError(walkingUnavailable);
 
-    } catch (error) {
-      console.error(error);
+      console.table(
+        results.map((pharmacy) => ({
+          id: pharmacy.id,
+          direct: pharmacy.directDistanceMeters,
+          walking: pharmacy.walkingDistanceMeters,
+          duration: pharmacy.walkingDurationSeconds,
+        }))
+      );
+    } catch (searchError) {
+      console.error(searchError);
       setError("Failed to search for pharmacies.");
+      setPharmacies([]);
     } finally {
       setIsLoading(false);
     }
@@ -111,12 +76,19 @@ function PharmacySearch({
     <>
       <button
         onClick={handleSearch}
-        disabled={!placesLibrary || isLoading}
+        disabled={!placesLibrary || isLoading || !selectedLocation}
       >
         {isLoading ? "Searching..." : "Search Pharmacies"}
       </button>
 
       {error && <p className="error-message">{error}</p>}
+
+      {walkingError && (
+        <p className="error-message">
+          Walking distances are unavailable right now — showing direct
+          distances only.
+        </p>
+      )}
     </>
   );
 }
