@@ -31,8 +31,10 @@ Step 11 in progress on `feature/candidate-recommendation`:
 - `lib/geo.js` centroid/midpoint helpers — committed (`36d7c99`).
 - `domain/candidates.js` + tests — committed (`ecaf1ec`).
   Every §9 edge case is pinned by tests (8 test files, 77 tests).
-- **Next:** recommender UI (trigger + panel + markers) is a separate
-  follow-up feature to be planned; logic is complete and tested.
+- Minimal verification UI — committed (`63d93a1`): `Recommend locations`
+  button, `CandidatesPanel` (top-3 cards), numbered map markers,
+  `useCandidateRecommendation` hook. A richer recommender UI remains
+  a follow-up feature.
 
 ## Verification log
 
