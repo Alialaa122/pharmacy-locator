@@ -17,14 +17,24 @@ with `node src/services/test-overpass.js`.
   a locally provided key — don't hardcode it in source.
 
 ## Architecture
-Single-page pharmacy locator (`src/App.jsx` is the only real entrypoint):
-- Google Maps via `@vis.gl/react-google-maps`; `places`/geometry libraries load
-  lazily with `useMapsLibrary(...)` — don't import map libraries statically.
-- Pharmacy search: `src/services/pharmacyService.js` (Places API + haversine).
-- OSM features (buildings, amenities, transit): `src/services/geographicService.js`
-  normalizing Overpass API results; Overpass queries hit a **personal
-  `overpass.nextgis.com` mirror**, not public `overpass-api.de`.
-  `src/services/osm-data.json` is a sample of the raw Overpass response shape.
+Single-page pharmacy locator. The agreed architecture lives in
+`docs/ARCHITECTURE.md`; the layout (post-refactor):
+- `App.jsx` — shared state + composition only.
+- `src/lib/` — pure helpers: `geo.js` (haversine, coordinate conversion),
+  `format.js` (display formatting), `categories.js` (data-only OSM category
+  registry — add new categories here, one entry).
+- `src/domain/pharmacyResults.js` — pure assembler producing the pharmacy
+  result list (plain data only, no SDK objects).
+- `src/services/` — one module per external provider: `placesService.js`
+  (Google Places), `routingService.js` (Valhalla walking matrix),
+  `osmService.js` (Overpass fetch/query — hits a **personal
+  `overpass.nextgis.com` mirror**, not public `overpass-api.de`) and
+  `osmNormalize.js` (raw OSM → uniform feature shape).
+- `src/hooks/useGeographicFeatures.js` — Overpass request state.
+- `src/components/` — `PharmacySearch` (pipeline orchestrator),
+  `map/OsmLayer.jsx`, plus panels. Google Maps rendering (`@vis.gl/...`)
+  is used directly by map components only; `useMapsLibrary("places")` in
+  `PharmacySearch`.
 
 ## Refactoring Workflow
 The agreed target architecture lives in `docs/ARCHITECTURE.md` — read it before
