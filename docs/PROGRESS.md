@@ -29,7 +29,7 @@ Step 11 in progress on `feature/candidate-recommendation`:
 - `routingService.getWalkingMatrix` — committed (`9330fb5`);
   `getWalkingRoutes` is now a thin wrapper, its contract unchanged.
 - `lib/geo.js` centroid/midpoint helpers — committed (`36d7c99`).
-- `domain/candidates.js` + tests — committed (see below).
+- `domain/candidates.js` + tests — committed (`ecaf1ec`).
   Every §9 edge case is pinned by tests (8 test files, 77 tests).
 - **Next:** recommender UI (trigger + panel + markers) is a separate
   follow-up feature to be planned; logic is complete and tested.
