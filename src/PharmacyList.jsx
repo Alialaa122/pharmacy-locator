@@ -1,4 +1,6 @@
 
+import { formatDistance, formatDuration, formatRadius } from "./lib/format.js";
+
 function PharmacyList({
   pharmacies,
   onSelectPharmacy,
@@ -7,14 +9,7 @@ function PharmacyList({
   onClearSearch
 }) {
   const nearestPharmacy = pharmacies[0];
-console.table(
-  pharmacies.map((pharmacy) => ({
-    name: pharmacy.displayName?.text,
-    distance: pharmacy.distance,
-    walkingDistance: pharmacy.walkingDistance,
-    walkingDuration: pharmacy.walkingDuration,
-  }))
-);
+
   return (
     <div className="pharmacy-list">
       <h2>Nearby Pharmacies</h2>
@@ -28,17 +23,14 @@ console.table(
         <p>{pharmacies.length} pharmacies found</p>
 
         <p>
-          Search radius:{" "}
-          {searchRadius >= 1000
-            ? `${searchRadius / 1000} km`
-            : `${searchRadius} m`}
+          Search radius: {formatRadius(searchRadius)}
         </p>
 
         {nearestPharmacy && (
           <p>
             Nearest pharmacy (walking):{" "}
-            {nearestPharmacy.walkingDistance != null
-              ? `${Math.round(nearestPharmacy.walkingDistance * 1000)} m`
+            {nearestPharmacy.walkingDistanceMeters != null
+              ? formatDistance(nearestPharmacy.walkingDistanceMeters)
               : "Unavailable"}
           </p>
         )}
@@ -54,28 +46,28 @@ console.table(
           className="pharmacy-card"
           onClick={() => onSelectPharmacy(pharmacy)}
         >
-          <h3>{pharmacy.displayName?.text}</h3>
+          <h3>{pharmacy.name}</h3>
 
-          <p>{pharmacy.formattedAddress}</p>
+          <p>{pharmacy.address}</p>
 
           <div className="pharmacy-distances">
             <p>
               <strong>Walking distance:</strong>{" "}
-              {pharmacy.walkingDistance != null
-                ? `${Math.round(pharmacy.walkingDistance * 1000)} m`
+              {pharmacy.walkingDistanceMeters != null
+                ? formatDistance(pharmacy.walkingDistanceMeters)
                 : "Unavailable"}
             </p>
 
             <p>
               <strong>Walking duration:</strong>{" "}
-              {pharmacy.walkingDuration != null
-                ? `${Math.ceil(pharmacy.walkingDuration / 60)} min`
+              {pharmacy.walkingDurationSeconds != null
+                ? formatDuration(pharmacy.walkingDurationSeconds)
                 : "Unavailable"}
             </p>
 
             <p>
               <strong>Direct distance:</strong>{" "}
-              {Math.round(pharmacy.distance)} m
+              {formatDistance(pharmacy.directDistanceMeters)}
             </p>
           </div>
         </div>

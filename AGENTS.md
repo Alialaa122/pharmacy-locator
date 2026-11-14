@@ -5,8 +5,7 @@
 - `npm run lint` — oxlint (config in `.oxlintrc.json`; `react/rules-of-hooks` is an error)
 - `npm run build` / `npm run preview`
 
-No test suite yet; a vitest runner is planned (step 2 of the roadmap in
-`docs/ARCHITECTURE.md`). Until then, don't invent `npm test`.
+- `npm run test` — vitest run (tests in `src/services/*.test.js`)
 `src/services/test-*.js` are standalone Node scripts (top-level await) — run directly
 with `node src/services/test-overpass.js`.
 

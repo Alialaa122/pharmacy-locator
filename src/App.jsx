@@ -5,177 +5,17 @@ import {
   AdvancedMarker,
   InfoWindow,
   useMap,
-  useMapsLibrary,
-  Circle,
-  Polygon,
-  Polyline
+  Circle
 } from "@vis.gl/react-google-maps";
-import {
-  searchGooglePharmacies,
-  calculateDistance 
-} from "./services/pharmacyService";
 import PharmacyList from "./PharmacyList.jsx";
-import { getGeographicFeatures } from "./services/geographicService.js";
 import GeographicAnalysis from "./GeographicAnalysis.jsx";
+import PharmacySearch from "./components/PharmacySearch.jsx";
+import OsmLayer from "./components/map/OsmLayer.jsx";
+import { useGeographicFeatures } from "./hooks/useGeographicFeatures.js";
+import { CATEGORIES } from "./lib/categories.js";
+import { formatDistance } from "./lib/format.js";
 
 
-
-
-
-function PharmacySearch({
-  setPharmacies,
-  selectedLocation,
-  searchRadius,
-  setHasSearched,
-}) {
-  const placesLibrary = useMapsLibrary("places");
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  async function handleSearch() {
-    setIsLoading(true);
-    setError("");
-
-    try {
-      const places = await searchGooglePharmacies(
-        placesLibrary,
-        selectedLocation,
-        searchRadius
-      );
-
-      let pharmaciesWithDistance = await Promise.all(
-        places.map(async (pharmacy) => {
-          const distance = calculateDistance(
-            selectedLocation,
-            {
-              lat: pharmacy.location.lat(),
-              lng: pharmacy.location.lng(),
-            }
-          );
-
-          return {
-            ...pharmacy,
-            distance,
-            walkingDistance: null,
-            walkingDuration: null,
-            location: pharmacy.location,
-            displayName: pharmacy.displayName,
-            formattedAddress: pharmacy.formattedAddress,
-          };
-        })
-      );
-
-      if (places.length >= 2) {
-        const firstTwoPharmacies = places.slice(0, 2);
-
-        const response = await fetch(
-          "https://valhalla1.openstreetmap.de/sources_to_targets",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              sources: [
-                {
-                  lat: selectedLocation.lat,
-                  lon: selectedLocation.lng,
-                },
-              ],
-              targets: places.map((pharmacy) => ({
-                lat: pharmacy.location.lat(),
-                lon: pharmacy.location.lng(),
-              })),
-              costing: "pedestrian",
-              units: "kilometers",
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Valhalla Matrix request failed");
-        }
-
-        const data = await response.json();
-
-        const routes = data.sources_to_targets[0];
-        console.log("Matrix routes:", routes);
-        console.log("First route:", routes[0]);
-        console.log("First place location:", {
-          lat: places[0].location.lat(),
-          lng: places[0].location.lng(),
-        });        
-          const pharmaciesWithDistance = places.map((pharmacy, index) => {
-            console.log("Original pharmacy:", pharmacy);
-            console.log("Original location:", pharmacy.location);
-            const lat = pharmacy.location.lat();
-            const lng = pharmacy.location.lng();
-            console.log("Coordinates before return:", lat, lng);
-          const route = routes[index];
-
-          return {
-            ...pharmacy,
-            distance: calculateDistance(selectedLocation, {
-              lat: pharmacy.location.lat(),
-              lng: pharmacy.location.lng(),
-            }),
-            walkingDistance: route?.distance ?? null,
-            walkingDuration: route?.time ?? null,
-            coordinates: { lat, lng },
-          };
-        });
-
-        pharmaciesWithDistance.sort((a, b) => {
-          if (a.walkingDistance === null) return 1;
-          if (b.walkingDistance === null) return -1;
-
-          return a.walkingDistance - b.walkingDistance;
-        });
-
-        setPharmacies(pharmaciesWithDistance);
-        console.log(
-        "Pharmacies with walking distance:",
-        pharmaciesWithDistance.map((pharmacy) => ({
-          name: pharmacy.displayName,
-          straightLine: pharmacy.distance,
-          walkingDistance: pharmacy.walkingDistance,
-          walkingDuration: pharmacy.walkingDuration,
-        }))
-      );
-        console.table(
-          pharmaciesWithDistance.map((pharmacy) => ({
-            id: pharmacy.id,
-            coordinates: pharmacy.coordinates,
-            walkingDistance: pharmacy.walkingDistance,
-            walkingDuration: pharmacy.walkingDuration,
-          }))
-        );
-        setHasSearched(true);
-      }
-      setHasSearched(true);
-
-    } catch (error) {
-      console.error(error);
-      setError("Failed to search for pharmacies.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  return (
-    <>
-      <button
-        onClick={handleSearch}
-        disabled={!placesLibrary || isLoading}
-      >
-        {isLoading ? "Searching..." : "Search Pharmacies"}
-      </button>
-
-      {error && <p className="error-message">{error}</p>}
-    </>
-  );
-}
 
 
 
@@ -205,59 +45,27 @@ function App() {
   const [pharmacies, setPharmacies] = useState([]);
   const [selectedPharmacy, setSelectedPharmacy] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
-  const [selectedAddress, setSelectedAddress] = useState("");
   const [searchRadius, setSearchRadius] = useState(1000);
   const [hasSearched, setHasSearched] = useState(false);
-  const [geographicFeatures, setGeographicFeatures] = useState([]);
-  const [isGeographicLoading, setIsGeographicLoading] = useState(false);
-  const [geographicError, setGeographicError] = useState("");
-  const geographicStats = {
-  buildings: geographicFeatures.filter(
-    (feature) => feature.category === "building"
-  ).length,
 
-  roads: geographicFeatures.filter(
-    (feature) => feature.category === "road"
-  ).length,
+  const {
+    features: geographicFeatures,
+    isLoading: isGeographicLoading,
+    error: geographicError,
+  } = useGeographicFeatures(selectedLocation, searchRadius);
 
-  schools: geographicFeatures.filter(
-    (feature) => feature.category === "school"
-  ).length,
-
-  hospitals: geographicFeatures.filter(
-    (feature) => feature.category === "hospital"
-  ).length,
-
-  atms: geographicFeatures.filter(
-    (feature) => feature.category === "atm"
-  ).length,
-
-  busStops: geographicFeatures.filter(
-    (feature) => feature.category === "bus_stop"
-  ).length,
-};
-  const polygonFeatures = geographicFeatures.filter(
-      (feature) =>
-        feature.geometryType === "Polygon" &&
-        ["building", "landuse", "amenity"].includes(feature.category)
-  );
-  const roadFeatures = geographicFeatures.filter(
-  (feature) => feature.category === "road"
-  );
-  const pointFeatures = geographicFeatures.filter(
-  (feature) => feature.geometryType === "Point"
-  );
-  console.log("Point features:", pointFeatures.length);
-  console.log("First point:", pointFeatures[0]);
+  const geographicStats = CATEGORIES.filter(
+    (category) => category.showInStats
+  ).map((category) => ({
+    id: category.id,
+    label: category.statsLabel,
+    count: geographicFeatures.filter(
+      (feature) => feature.category === category.id
+    ).length,
+  }));
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
-  function convertCoordinates(coordinates) {
-    return coordinates.map(([longitude, latitude]) => ({
-      lat: latitude,
-      lng: longitude,
-    }));
-  }
   function handleClearSearch() {
     setPharmacies([]);
     setSelectedPharmacy(null);
@@ -267,31 +75,6 @@ function App() {
   function handleLocationSelect(location) {
     setSelectedLocation(location);
   }
-
-  useEffect(() => {
-    if (!selectedLocation) return;
-
-    async function loadGeographicFeatures() {
-      setIsGeographicLoading(true);
-      setGeographicError("");
-
-      try {
-        const features = await getGeographicFeatures(
-          selectedLocation.lat,
-          selectedLocation.lng,
-          searchRadius
-        );
-
-        setGeographicFeatures(features);
-      } catch (error) {
-        setGeographicError("Failed to load geographic data.");
-      } finally {
-        setIsGeographicLoading(false);
-      }
-    }
-
-    loadGeographicFeatures();
-  }, [selectedLocation, searchRadius]);
 
   return (
     
@@ -319,15 +102,18 @@ function App() {
         >
           {selectedPharmacy && (
             <InfoWindow
-              position={selectedPharmacy.coordinates}
+              position={{
+                lat: selectedPharmacy.lat,
+                lng: selectedPharmacy.lng,
+              }}
               onCloseClick={() => setSelectedPharmacy(null)}
             >
               <div>
-                <h3>{selectedPharmacy.displayName?.text}</h3>
-                <p>{selectedPharmacy.formattedAddress}</p>
+                <h3>{selectedPharmacy.name}</h3>
+                <p>{selectedPharmacy.address}</p>
                 <p>
                   Direct distance:{" "}
-                  {Math.round(selectedPharmacy.distance).toLocaleString("en-US")} m
+                  {formatDistance(selectedPharmacy.directDistanceMeters)}
                 </p>
                 <small>
                   Measured in a straight line, not walking or driving distance.
@@ -336,50 +122,7 @@ function App() {
             </InfoWindow>
           )}
           <MapClickHandler onLocationSelect={handleLocationSelect} />
-          {polygonFeatures.map((feature) => (
-          <Polygon
-            key={feature.id}
-            paths={convertCoordinates(feature.coordinates[0])}
-            options={{
-              fillColor: "#3b82f6",
-              fillOpacity: 0.2,
-              strokeColor: "#2563eb",
-              strokeOpacity: 0.8,
-              strokeWeight: 1,
-            }}
-          />
-          ))}
-          {roadFeatures.map((feature) => (
-          <Polyline
-              key={feature.id}
-              path={convertCoordinates(feature.coordinates)}
-              options={{
-                strokeColor: "#f97316",
-                strokeOpacity: 0.8,
-                strokeWeight: 2,
-              }}
-            />
-          ))}
-          {pointFeatures.map((feature) => (
-            <AdvancedMarker
-              key={feature.id}
-              position={{
-                lat: feature.coordinates[1],
-                lng: feature.coordinates[0],
-              }}
-              title={feature.name || feature.category}
-            >
-              <div className="geographic-marker">
-                {{
-                  hospital: "🏥",
-                  school: "🏫",
-                  atm: "🏧",
-                  bus_stop: "🚌",
-                  pharmacy: "💊",
-                }[feature.category] || "📍"}
-              </div>
-            </AdvancedMarker>
-          ))}
+          <OsmLayer features={geographicFeatures} />
 
           {selectedLocation && (
             <AdvancedMarker position={selectedLocation}>
@@ -410,8 +153,8 @@ function App() {
           {pharmacies.map((pharmacy) => (
             <AdvancedMarker
               key={pharmacy.id}
-              position={pharmacy.coordinates}
-              title={pharmacy.displayName?.text}
+              position={{ lat: pharmacy.lat, lng: pharmacy.lng }}
+              title={pharmacy.name}
               onClick={() => setSelectedPharmacy(pharmacy)}
             />
         ))}
