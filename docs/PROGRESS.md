@@ -14,10 +14,11 @@
 | 5 | Units + formatting | ✅ Done | `73064c9` | `lib/format.js`; `convertCoordinates` → `lib/geo.js` |
 | 6 | Geographic-analysis re-homing | ✅ Done | `f62f4a6` | `useGeographicFeatures` hook + `OsmLayer`; `App.jsx` ~278 → 196 lines |
 | 7 | Category registry | ✅ Done | `b7b2a95` | `lib/categories.js`; query/classification/icons/stats registry-driven |
-| 8 | Cleanup pass | ⬜ Next | — | debug logs, unused state, service rename, doc refresh |
-| 9 | City selector feature | ⬜ Pending | — | first feature after refactor; Alexandria/Cairo/Matrouh |
+| 8 | Cleanup pass | ✅ Done | `ed9cbde`, `34f72be` | service split (osmService/osmNormalize), logs + dead code removed, lint fully clean |
+| 9 | City selector feature | ⬜ Next | — | first feature after refactor; Alexandria/Cairo/Matrouh |
 
 **Tests: 35 passing** (5 files: osmNormalize, geo, format, pharmacyResults, categories)
+**Lint: completely clean** (as of step 8)
 
 ## Verification log
 
