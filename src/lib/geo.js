@@ -32,3 +32,17 @@ export function calculateDistance(point1, point2) {
 
   return R * c;
 }
+
+/**
+ * Converts an OSM/GeoJSON coordinate ring ([longitude, latitude] pairs)
+ * into Google Maps positions ({ lat, lng } objects), flipping the axis order.
+ *
+ * @param {Array<[number, number]>} coordinates - [lon, lat] pairs
+ * @returns {Array<{ lat: number, lng: number }>}
+ */
+export function convertCoordinates(coordinates) {
+  return coordinates.map(([longitude, latitude]) => ({
+    lat: latitude,
+    lng: longitude,
+  }));
+}

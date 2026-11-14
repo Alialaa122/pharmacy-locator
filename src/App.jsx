@@ -13,6 +13,8 @@ import PharmacyList from "./PharmacyList.jsx";
 import { getGeographicFeatures } from "./services/geographicService.js";
 import GeographicAnalysis from "./GeographicAnalysis.jsx";
 import PharmacySearch from "./components/PharmacySearch.jsx";
+import { convertCoordinates } from "./lib/geo.js";
+import { formatDistance } from "./lib/format.js";
 
 
 
@@ -91,12 +93,6 @@ function App() {
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
-  function convertCoordinates(coordinates) {
-    return coordinates.map(([longitude, latitude]) => ({
-      lat: latitude,
-      lng: longitude,
-    }));
-  }
   function handleClearSearch() {
     setPharmacies([]);
     setSelectedPharmacy(null);
@@ -169,7 +165,7 @@ function App() {
                 <p>{selectedPharmacy.address}</p>
                 <p>
                   Direct distance:{" "}
-                  {Math.round(selectedPharmacy.directDistanceMeters).toLocaleString("en-US")} m
+                  {formatDistance(selectedPharmacy.directDistanceMeters)}
                 </p>
                 <small>
                   Measured in a straight line, not walking or driving distance.

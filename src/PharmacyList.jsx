@@ -1,4 +1,6 @@
 
+import { formatDistance, formatDuration, formatRadius } from "./lib/format.js";
+
 function PharmacyList({
   pharmacies,
   onSelectPharmacy,
@@ -28,17 +30,14 @@ console.table(
         <p>{pharmacies.length} pharmacies found</p>
 
         <p>
-          Search radius:{" "}
-          {searchRadius >= 1000
-            ? `${searchRadius / 1000} km`
-            : `${searchRadius} m`}
+          Search radius: {formatRadius(searchRadius)}
         </p>
 
         {nearestPharmacy && (
           <p>
             Nearest pharmacy (walking):{" "}
             {nearestPharmacy.walkingDistanceMeters != null
-              ? `${Math.round(nearestPharmacy.walkingDistanceMeters)} m`
+              ? formatDistance(nearestPharmacy.walkingDistanceMeters)
               : "Unavailable"}
           </p>
         )}
@@ -62,20 +61,20 @@ console.table(
             <p>
               <strong>Walking distance:</strong>{" "}
               {pharmacy.walkingDistanceMeters != null
-                ? `${Math.round(pharmacy.walkingDistanceMeters)} m`
+                ? formatDistance(pharmacy.walkingDistanceMeters)
                 : "Unavailable"}
             </p>
 
             <p>
               <strong>Walking duration:</strong>{" "}
               {pharmacy.walkingDurationSeconds != null
-                ? `${Math.ceil(pharmacy.walkingDurationSeconds / 60)} min`
+                ? formatDuration(pharmacy.walkingDurationSeconds)
                 : "Unavailable"}
             </p>
 
             <p>
               <strong>Direct distance:</strong>{" "}
-              {Math.round(pharmacy.directDistanceMeters)} m
+              {formatDistance(pharmacy.directDistanceMeters)}
             </p>
           </div>
         </div>
