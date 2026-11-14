@@ -247,7 +247,13 @@ features (existing Overpass fetch) + pharmacies (existing search results)
        (guarantees the EDA pass by walking >= straight-line)
        sort by that margin DOWN (most separated first), keep top 10
   3. routingService.getWalkingMatrix(candidates, pharmacies)
-       one Valhalla POST (K sources x P targets);
+       Valhalla POST(s) (K sources x P targets). The service caps each
+        request at 100 locations (sources + targets, probed live:
+        1x100 -> 200, 1x101 -> 400; 10x10 -> 200, 10x11 -> 400), so
+        it chunks the TARGETS, stays under the cap, and merges the
+        response rows into one matrix. With the current budgets
+        (max 10 candidates, max 20 pharmacies) this is 1-2 requests;
+        the same cap logic keeps it working for any future size.
        getWalkingRoutes() becomes a wrapper — its contract is unchanged
   4. rankCandidates(sites, matrix)               (pure)
        per candidate: min WALKING distance to any pharmacy = separation;
