@@ -12,6 +12,7 @@ import GeographicAnalysis from "./GeographicAnalysis.jsx";
 import PharmacySearch from "./components/PharmacySearch.jsx";
 import OsmLayer from "./components/map/OsmLayer.jsx";
 import { useGeographicFeatures } from "./hooks/useGeographicFeatures.js";
+import { CATEGORIES } from "./lib/categories.js";
 import { formatDistance } from "./lib/format.js";
 
 
@@ -54,31 +55,15 @@ function App() {
     error: geographicError,
   } = useGeographicFeatures(selectedLocation, searchRadius);
 
-  const geographicStats = {
-    buildings: geographicFeatures.filter(
-      (feature) => feature.category === "building"
+  const geographicStats = CATEGORIES.filter(
+    (category) => category.showInStats
+  ).map((category) => ({
+    id: category.id,
+    label: category.statsLabel,
+    count: geographicFeatures.filter(
+      (feature) => feature.category === category.id
     ).length,
-
-    roads: geographicFeatures.filter(
-      (feature) => feature.category === "road"
-    ).length,
-
-    schools: geographicFeatures.filter(
-      (feature) => feature.category === "school"
-    ).length,
-
-    hospitals: geographicFeatures.filter(
-      (feature) => feature.category === "hospital"
-    ).length,
-
-    atms: geographicFeatures.filter(
-      (feature) => feature.category === "atm"
-    ).length,
-
-    busStops: geographicFeatures.filter(
-      (feature) => feature.category === "bus_stop"
-    ).length,
-  };
+  }));
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 

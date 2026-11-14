@@ -1,15 +1,6 @@
 import { Polygon, Polyline, AdvancedMarker } from "@vis.gl/react-google-maps";
 import { convertCoordinates } from "../../lib/geo.js";
-
-// Step 7 (category registry) will replace this hard-coded map with
-// the registry's icon field.
-const CATEGORY_ICONS = {
-  hospital: "🏥",
-  school: "🏫",
-  atm: "🏧",
-  bus_stop: "🚌",
-  pharmacy: "💊",
-};
+import { getCategory } from "../../lib/categories.js";
 
 /**
  * Renders OpenStreetMap features on the map. Rendering dispatches by
@@ -22,8 +13,7 @@ const CATEGORY_ICONS = {
 function OsmLayer({ features }) {
   const polygonFeatures = features.filter(
     (feature) =>
-      feature.geometryType === "Polygon" &&
-      ["building", "landuse", "amenity"].includes(feature.category)
+      feature.geometryType === "Polygon" && getCategory(feature.category)?.polygon
   );
   const roadFeatures = features.filter(
     (feature) => feature.category === "road"
@@ -68,7 +58,7 @@ function OsmLayer({ features }) {
           title={feature.name || feature.category}
         >
           <div className="geographic-marker">
-            {CATEGORY_ICONS[feature.category] || "📍"}
+            {getCategory(feature.category)?.icon || "📍"}
           </div>
         </AdvancedMarker>
       ))}

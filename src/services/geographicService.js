@@ -1,3 +1,5 @@
+import { CATEGORIES } from "../lib/categories.js";
+
 export function normalizeOsmElements(elements) {
   // Create lookup Maps once
   const nodesById = createNodesMap(elements);
@@ -22,9 +24,10 @@ export function isArea(tags) {
   return Boolean(
     tags.building ||
     tags.landuse ||
-    tags.amenity === "school" ||
-    tags.amenity === "hospital" ||
-    tags.amenity === "university"
+    (tags.amenity &&
+      CATEGORIES.some(
+        (category) => category.areaAmenity && category.id === tags.amenity
+      ))
   );
 }
 
@@ -124,11 +127,12 @@ function normalizeRelation(relation, waysById, nodesById) {
 }
 
 function getAreaCategory(tags) {
-  if (tags.building) return "building";
-  if (tags.landuse) return "landuse";
-  if (tags.amenity) return "amenity";
+  // Precedence = registry order: building before landuse before amenity.
+  const areaCategory = CATEGORIES.find(
+    (category) => category.areaTag && tags[category.areaTag]
+  );
 
-  return "unknown";
+  return areaCategory ? areaCategory.id : "unknown";
 }
 
 
@@ -215,25 +219,20 @@ export function normalizeOsmElement(element) {
 
 
 function getNodeCategory(tags) {
-  const amenityCategories = [
-    "pharmacy",
-    "hospital",
-    "clinic",
-    "school",
-    "university",
-    "kindergarten",
-    "atm",
-  ];
+  const amenityCategory = CATEGORIES.find(
+    (category) => category.amenityValue && category.id === tags?.amenity
+  );
 
-  if (amenityCategories.includes(tags?.amenity)) {
-    return tags.amenity;
+  if (amenityCategory) {
+    return amenityCategory.id;
   }
 
-  if (tags?.highway === "bus_stop") {
-    return "bus_stop";
-  }
+  const highwayCategory = CATEGORIES.find(
+    (category) =>
+      category.highwayValue && category.highwayValue === tags?.highway
+  );
 
-  return null;
+  return highwayCategory ? highwayCategory.id : null;
 }
 
 
@@ -267,19 +266,18 @@ export async function fetchOsmData(query) {
 
 
 function buildOverpassQuery(latitude, longitude, radius) {
+  const around = `(around:${radius},${latitude},${longitude})`;
+
+  const clauses = CATEGORIES
+    .flatMap((category) => category.overpass ?? [])
+    .map((selector) => `    ${selector}${around};`)
+    .join("\n");
+
   return `
     [out:json][timeout:25];
 
     (
-      way["building"](around:${radius},${latitude},${longitude});
-      way["landuse"](around:${radius},${latitude},${longitude});
-
-      way["amenity"](around:${radius},${latitude},${longitude});
-      node["amenity"](around:${radius},${latitude},${longitude});
-
-      node["highway"="bus_stop"](around:${radius},${latitude},${longitude});
-
-      way["highway"](around:${radius},${latitude},${longitude});
+${clauses}
     );
 
     out geom;
