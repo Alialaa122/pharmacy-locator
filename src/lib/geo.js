@@ -139,3 +139,62 @@ export function lineMidpoint(coordinates) {
 
   return coordinates[midIndex];
 }
+
+/** Earth circumference per degree, in meters (2πR/360, R = 6 371 000). */
+const METERS_PER_DEGREE = (2 * Math.PI * 6371000) / 360;
+
+/**
+ * Shortest distance from a point to a [lon, lat] polyline, in METERS.
+ *
+ * Planar approximation: all coordinates are projected onto a flat
+ * local plane anchored at the polyline's first vertex, with longitude
+ * scaled by cos(origin latitude) so degrees become comparable in
+ * both axes. Accurate at city scale (tens of km at most) — the same
+ * rationale as polygonCentroid's planar math.
+ *
+ * @param {{ lat: number, lng: number }} point
+ * @param {Array<[number, number]>} coordinates - [lon, lat] sequence
+ * @returns {number | null} minimum distance in meters, or null for
+ *   degenerate input (missing point / fewer than 2 vertices)
+ */
+export function distanceToPolylineMeters(point, coordinates) {
+  if (!point || !coordinates || coordinates.length < 2) {
+    return null;
+  }
+
+  const [originLon, originLat] = coordinates[0];
+  const cosLat = Math.cos(toRadians(originLat));
+
+  const project = ([lon, lat]) => [
+    (lon - originLon) * cosLat * METERS_PER_DEGREE,
+    (lat - originLat) * METERS_PER_DEGREE,
+  ];
+
+  const [px, py] = project([point.lng, point.lat]);
+
+  let minMeters = Infinity;
+
+  for (let i = 0; i < coordinates.length - 1; i++) {
+    const [ax, ay] = project(coordinates[i]);
+    const [bx, by] = project(coordinates[i + 1]);
+
+    const abx = bx - ax;
+    const aby = by - ay;
+
+    // Squared segment length (0 for a collapsed segment — the clamped
+    // clamp below then yields the endpoint).
+    const abLengthSq = abx * abx + aby * aby;
+
+    const t =
+      abLengthSq === 0
+        ? 0
+        : Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / abLengthSq));
+
+    const dx = px - (ax + t * abx);
+    const dy = py - (ay + t * aby);
+
+    minMeters = Math.min(minMeters, Math.hypot(dx, dy));
+  }
+
+  return minMeters;
+}
