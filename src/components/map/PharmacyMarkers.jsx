@@ -10,13 +10,19 @@ import { AdvancedMarker } from "@vis.gl/react-google-maps";
  *   pharmacies: Array<{ id: string, name: string, lat: number, lng: number }>,
  *   selectedPharmacyId: string | null,
  *   onSelectPharmacy: (pharmacy: object) => void,
+ *   visible?: boolean,
  * }} props
  */
 function PharmacyMarkers({
   pharmacies,
   selectedPharmacyId,
   onSelectPharmacy,
+  visible = true,
 }) {
+  if (!visible) {
+    return null;
+  }
+
   return (
     <>
       {pharmacies.map((pharmacy) => (

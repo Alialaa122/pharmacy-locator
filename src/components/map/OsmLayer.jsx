@@ -8,18 +8,38 @@ import { getCategory } from "../../lib/categories.js";
  * (Preserved from the original App.jsx, including the single-ring-only
  * polygon filter — MultiPolygon relations are intentionally not drawn.)
  *
- * @param {{ features: Array }} props - normalized OSM features
+ * Only the categories in `visibleCategories` are drawn — the features
+ * themselves are always loaded, so a hidden layer never triggers a new
+ * request and the analysis can keep counting it.
+ *
+ * @param {{
+ *   features: Array,
+ *   visibleCategories?: Set<string> | Array<string>,
+ * }} props - normalized OSM features
  */
-function OsmLayer({ features }) {
+function OsmLayer({ features, visibleCategories }) {
+  const isVisible = (category) => {
+    if (!visibleCategories) {
+      return true;
+    }
+
+    return visibleCategories.has
+      ? visibleCategories.has(category)
+      : visibleCategories.includes(category);
+  };
+
   const polygonFeatures = features.filter(
     (feature) =>
-      feature.geometryType === "Polygon" && getCategory(feature.category)?.polygon
+      feature.geometryType === "Polygon" &&
+      getCategory(feature.category)?.polygon &&
+      isVisible(feature.category)
   );
   const roadFeatures = features.filter(
-    (feature) => feature.category === "road"
+    (feature) => feature.category === "road" && isVisible(feature.category)
   );
   const pointFeatures = features.filter(
-    (feature) => feature.geometryType === "Point"
+    (feature) =>
+      feature.geometryType === "Point" && isVisible(feature.category)
   );
 
   return (

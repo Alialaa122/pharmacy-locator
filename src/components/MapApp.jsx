@@ -6,6 +6,7 @@ import PharmacyList from "../PharmacyList.jsx";
 import GeographicAnalysis from "../GeographicAnalysis.jsx";
 import SearchPanel from "./SearchPanel.jsx";
 import CandidatesPanel from "./CandidatesPanel.jsx";
+import LayersControl from "./LayersControl.jsx";
 import OsmLayer from "./map/OsmLayer.jsx";
 import CityMapMover from "./map/CityMapMover.jsx";
 import MapClickHandler from "./map/MapClickHandler.jsx";
@@ -19,6 +20,10 @@ import { useGeographicFeatures } from "../hooks/useGeographicFeatures.js";
 import { useCandidateRecommendation } from "../hooks/useCandidateRecommendation.js";
 import { CATEGORIES } from "../lib/categories.js";
 import { DEFAULT_CITY } from "../lib/cities.js";
+import {
+  DEFAULT_LAYER_VISIBILITY,
+  visibleCategories,
+} from "../lib/layers.js";
 import { ROUTES } from "../router.jsx";
 
 const TABS = {
@@ -43,6 +48,9 @@ function MapApp({ apiKey }) {
   const [hasSearched, setHasSearched] = useState(false);
   const [activeTab, setActiveTab] = useState(TABS.results);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [layerVisibility, setLayerVisibility] = useState(
+    DEFAULT_LAYER_VISIBILITY
+  );
   // { forRecommendation, index } — bound to the exact recommendation
   // array it came from, so a new search / new recommendation (a new
   // array reference) invalidates the selection automatically — no
@@ -122,6 +130,18 @@ function MapApp({ apiKey }) {
   function handleCitySelect(city) {
     setSelectedCity(city);
   }
+
+  function handleToggleLayer(groupId) {
+    setLayerVisibility((current) => ({
+      ...current,
+      [groupId]: !current[groupId],
+    }));
+  }
+
+  // Which OSM categories the map should draw. Derived from the layer
+  // visibility only — the features themselves stay loaded, so hiding a
+  // layer never triggers a new request.
+  const drawnCategories = visibleCategories(layerVisibility);
 
   const canRecommend =
     hasSearched &&
@@ -208,7 +228,10 @@ function MapApp({ apiKey }) {
                 )}
 
                 <MapClickHandler onLocationSelect={handleLocationSelect} />
-                <OsmLayer features={geographicFeatures} />
+                <OsmLayer
+                  features={geographicFeatures}
+                  visibleCategories={drawnCategories}
+                />
 
                 {selectedLocation && (
                   <LocationMarker position={selectedLocation} />
@@ -224,6 +247,7 @@ function MapApp({ apiKey }) {
                   pharmacies={pharmacies}
                   selectedPharmacyId={selectedPharmacy?.id ?? null}
                   onSelectPharmacy={setSelectedPharmacy}
+                  visible={layerVisibility.pharmacies}
                 />
 
                 {selectedCandidate && (
@@ -251,6 +275,12 @@ function MapApp({ apiKey }) {
               setPharmacies={setPharmacies}
               selectedLocation={selectedLocation}
               setHasSearched={setHasSearched}
+            />
+
+            <LayersControl
+              visibility={layerVisibility}
+              onToggle={handleToggleLayer}
+              hasData={geographicFeatures.length > 0}
             />
           </main>
         </div>
