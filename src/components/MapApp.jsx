@@ -18,12 +18,12 @@ import CandidateInfoWindow from "./map/CandidateInfoWindow.jsx";
 import CandidateMarkers from "./map/CandidateMarkers.jsx";
 import { useGeographicFeatures } from "../hooks/useGeographicFeatures.js";
 import { useCandidateRecommendation } from "../hooks/useCandidateRecommendation.js";
-import { CATEGORIES } from "../lib/categories.js";
 import { DEFAULT_CITY } from "../lib/cities.js";
 import {
   DEFAULT_LAYER_VISIBILITY,
   visibleCategories,
 } from "../lib/layers.js";
+import { computeAnalysisStats } from "../domain/analysis.js";
 import { ROUTES } from "../router.jsx";
 
 const TABS = {
@@ -76,15 +76,7 @@ function MapApp({ apiKey }) {
     pharmacies
   );
 
-  const geographicStats = CATEGORIES.filter(
-    (category) => category.showInStats
-  ).map((category) => ({
-    id: category.id,
-    label: category.statsLabel,
-    count: geographicFeatures.filter(
-      (feature) => feature.category === category.id
-    ).length,
-  }));
+  const geographicStats = computeAnalysisStats(geographicFeatures);
 
   // A selected candidate is an index into the CURRENT recommendation.
   // A new search / clear invalidates the recommendation (reference

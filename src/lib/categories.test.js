@@ -11,26 +11,9 @@ describe("categories registry", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("stats categories match the six the panel has always shown, in order", () => {
-    const statsIds = CATEGORIES
-      .filter((category) => category.showInStats)
-      .map((category) => category.id);
-
-    expect(statsIds).toEqual([
-      "building",
-      "road",
-      "school",
-      "hospital",
-      "atm",
-      "bus_stop",
-    ]);
-  });
-
-  it("every showInStats entry has a statsLabel", () => {
+  it("every category carries a readable stats label", () => {
     for (const category of CATEGORIES) {
-      if (category.showInStats) {
-        expect(category.statsLabel, category.id).toBeTruthy();
-      }
+      expect(category.statsLabel, category.id).toBeTruthy();
     }
   });
 

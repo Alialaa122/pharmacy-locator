@@ -8,7 +8,7 @@
  *   areaAmenity` (matching MECHANISMS stay code; the set of categories
  *   and their tag mappings live here)
  * - OsmLayer: `icon`, `polygon`, `mapStyle`
- * - GeographicAnalysis stats: `showInStats`, `statsLabel`
+ * - GeographicAnalysis stats: `statsLabel`
  *
  * The mapping flags:
  * - `areaTag`:      OSM tag key whose presence makes a closed way this category
@@ -31,7 +31,6 @@ export const CATEGORIES = [
     polygon: true,
     overpass: ['way["building"]'],
     icon: null,
-    showInStats: true,
     statsLabel: "Buildings",
     mapStyle: {
       fill: "#f59e0b",
@@ -47,8 +46,7 @@ export const CATEGORIES = [
     polygon: true,
     overpass: ['way["landuse"]'],
     icon: null,
-    showInStats: false,
-    statsLabel: null,
+    statsLabel: "Land use areas",
     mapStyle: {
       fill: "#14b8a6",
       fillOpacity: 0.2,
@@ -63,8 +61,7 @@ export const CATEGORIES = [
     polygon: true,
     overpass: ['way["amenity"]', 'node["amenity"]'],
     icon: null,
-    showInStats: false,
-    statsLabel: null,
+    statsLabel: "Amenity areas",
     mapStyle: {
       fill: "#14b8a6",
       fillOpacity: 0.16,
@@ -77,7 +74,6 @@ export const CATEGORIES = [
     id: "road",
     overpass: ['way["highway"]'],
     icon: null,
-    showInStats: true,
     statsLabel: "Roads",
     mapStyle: {
       stroke: "#475569",
@@ -91,7 +87,6 @@ export const CATEGORIES = [
     amenityValue: true,
     areaAmenity: true,
     icon: "🏫",
-    showInStats: true,
     statsLabel: "Schools",
     mapStyle: { color: "#2563eb" },
   },
@@ -101,7 +96,6 @@ export const CATEGORIES = [
     amenityValue: true,
     areaAmenity: true,
     icon: "🏥",
-    showInStats: true,
     statsLabel: "Hospitals",
     mapStyle: { color: "#dc2626" },
   },
@@ -110,7 +104,6 @@ export const CATEGORIES = [
     id: "atm",
     amenityValue: true,
     icon: "🏧",
-    showInStats: true,
     statsLabel: "ATMs",
     mapStyle: { color: "#4f46e5" },
   },
@@ -120,7 +113,6 @@ export const CATEGORIES = [
     highwayValue: "bus_stop",
     overpass: ['node["highway"="bus_stop"]'],
     icon: "🚌",
-    showInStats: true,
     statsLabel: "Bus Stops",
     mapStyle: { color: "#0d9488" },
   },
@@ -129,8 +121,7 @@ export const CATEGORIES = [
     id: "pharmacy",
     amenityValue: true,
     icon: "💊",
-    showInStats: false,
-    statsLabel: null,
+    statsLabel: "Pharmacies",
     mapStyle: { color: "#16a34a" },
   },
 
@@ -138,8 +129,7 @@ export const CATEGORIES = [
     id: "clinic",
     amenityValue: true,
     icon: "✚",
-    showInStats: false,
-    statsLabel: null,
+    statsLabel: "Clinics",
     mapStyle: { color: "#db2777" },
   },
 
@@ -148,8 +138,7 @@ export const CATEGORIES = [
     amenityValue: true,
     areaAmenity: true,
     icon: "🎓",
-    showInStats: false,
-    statsLabel: null,
+    statsLabel: "Universities",
     mapStyle: { color: "#7c3aed" },
   },
 
@@ -157,16 +146,14 @@ export const CATEGORIES = [
     id: "kindergarten",
     amenityValue: true,
     icon: "🧸",
-    showInStats: false,
-    statsLabel: null,
+    statsLabel: "Kindergartens",
     mapStyle: { color: "#ea580c" },
   },
 
   {
     id: "unknown",
     icon: null,
-    showInStats: false,
-    statsLabel: null,
+    statsLabel: "Other",
     mapStyle: { color: "#64748b" },
   },
 ];

@@ -1,11 +1,11 @@
 /**
- * Geographic analysis panel — counts of the OSM features found in the
- * selected radius. Display only: the numbers are derived from the
- * loaded features and are independent of what the map currently
- * draws.
+ * Geographic analysis panel — the statistics of the selected area.
+ *
+ * Display only: the numbers are derived from the loaded features and
+ * stay the same whether or not the matching layer is drawn on the map.
  *
  * @param {{
- *   stats: Array<{ id: string, label: string, count: number }>,
+ *   stats: { total: number, groups: Array<{ id: string, label: string, total: number, items: Array<{ key: string, label: string, count: number }>, other: number }> },
  *   isLoading: boolean,
  *   error: string,
  *   hasLocation: boolean,
@@ -27,16 +27,61 @@ function GeographicAnalysis({ stats, isLoading, error, hasLocation }) {
       ) : (
         <>
           <p className="analysis-hint">
-            Statistics come from the loaded map data — enable a layer to
-            see the features drawn on the map.
+            These numbers come from the loaded area data. Enable a layer
+            to see the features drawn on the map.
           </p>
 
-          {stats.map((stat) => (
-            <div className="stat-row" key={stat.id}>
-              <span className="stat-label">{stat.label}</span>
-              <span className="stat-count">{stat.count}</span>
-            </div>
-          ))}
+          {stats.groups
+            .filter((group) => group.total > 0)
+            .map((group) => {
+              const max = group.items[0]?.count ?? 1;
+
+              return (
+                <section className="analysis-group" key={group.id}>
+                  <div className="analysis-group-head">
+                    <h3 className="analysis-group-label">{group.label}</h3>
+                    <span className="analysis-group-total">
+                      {group.total}
+                    </span>
+                  </div>
+
+                  <ul className="analysis-breakdown">
+                    {group.items.map((item) => (
+                      <li className="analysis-item" key={item.key}>
+                        <span className="analysis-item-label">
+                          {item.label}
+                        </span>
+                        <span className="analysis-item-count">
+                          {item.count}
+                        </span>
+                        <span
+                          className="analysis-item-bar"
+                          style={{
+                            width: `${Math.round((item.count / max) * 100)}%`,
+                          }}
+                          aria-hidden="true"
+                        />
+                      </li>
+                    ))}
+
+                    {group.other > 0 && (
+                      <li className="analysis-item is-other">
+                        <span className="analysis-item-label">Other</span>
+                        <span className="analysis-item-count">
+                          {group.other}
+                        </span>
+                      </li>
+                    )}
+                  </ul>
+                </section>
+              );
+            })}
+
+          {stats.total === 0 && (
+            <p className="panel-empty">
+              No geographic features were found in this area.
+            </p>
+          )}
         </>
       )}
     </div>
