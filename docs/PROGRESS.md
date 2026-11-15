@@ -17,24 +17,35 @@
 | 8 | Cleanup pass | ✅ Done | `ed9cbde`, `34f72be` | service split (osmService/osmNormalize), logs + dead code removed, lint fully clean |
 | 9 | City selector feature | ✅ Done | `77bc1de` (feature/city-selector) | Alexandria/Cairo/Matrouh; CityMapMover; SearchPanel split |
 | 10 | Eligibility evaluator (EDA rule) | ✅ Done | `7881c7e` merged `6acbd22` | `domain/eligibility.js` + `LocationVerdict`; walking-distance-based bands; Unverified semantics |
-| 11 | Candidate recommendation (logic only) | 🔧 In progress | — (feature/candidate-recommendation) | auto candidates (building centroids + road midpoints), 100 m straight-line hard gate, top-10 Valhalla certification, top-3 ranking; UI deferred |
+| 11 | Geographic candidate finder | ✅ Done (on `feature/candidate-recommendation`, pending browser verification + merge) | `cab5828`, `5080d99` | grid point generation, 15 m road exclusion, WALKING ≥ 100 m validity gate, top-3 mutually distinct candidates; replaced the earlier OSM-site recommender |
 
-**Tests: 77 passing** (8 files: osmNormalize, geo, format, pharmacyResults, categories, cities, eligibility, candidates)
+**Tests: 85 passing** (8 files: osmNormalize, geo, format, pharmacyResults, categories, cities, eligibility, candidates)
 **Lint: completely clean** (as of step 8)
 
 Refactor steps 1–8 merged to main (`853bdd2`). Step 9 (city selector) merged
 to main (`007eaef`). Step 10 (eligibility evaluator) merged to main (`6acbd22`).
-Step 11 in progress on `feature/candidate-recommendation`:
-- Docs spec — committed (`322f5c1`).
-- `routingService.getWalkingMatrix` — committed (`9330fb5`);
-  `getWalkingRoutes` is now a thin wrapper, its contract unchanged.
-- `lib/geo.js` centroid/midpoint helpers — committed (`36d7c99`).
-- `domain/candidates.js` + tests — committed (`ecaf1ec`).
-  Every §9 edge case is pinned by tests (8 test files, 77 tests).
-- Minimal verification UI — committed (`63d93a1`): `Recommend locations`
-  button, `CandidatesPanel` (top-3 cards), numbered map markers,
-  `useCandidateRecommendation` hook. A richer recommender UI remains
-  a follow-up feature.
+Step 11 on `feature/candidate-recommendation` (planned, approved, implemented):
+- Planning: the feature was re-planned as the Geographic Candidate Finder
+  (geometric sampling, not OSM-derived sites); all open questions approved
+  (grid spacing radius/4, 15 m road tolerance, strict walking-gate
+  rejection, 200 m mutual spacing, scan-order selection).
+- Pre-task — `cb5315a`: Valhalla cap corrected to 100 CELLS
+  (sources × targets, probed live); recommend button disabled while
+  Overpass loads.
+- `lib/geo.js distanceToPolylineMeters` — committed (`e1b636e`):
+  planar point-to-segment, meters, cos(lat) longitude scaling.
+- `domain/candidates.js` rewrite — committed (`cab5828`):
+  `generateCandidatePoints` (5×5 grid, radius/4 spacing), `filterOffRoad`,
+  `filterFarEnough` (rejection-only), `budgetCandidates`,
+  `applyWalkingGate` (any missing route ⇒ invalid),
+  `selectDistinctCandidates`; old OSM-site pipeline + centroid/midpoint
+  helpers removed.
+- UI + hook — committed (`5080d99`):
+  `useCandidateRecommendation(location, radius, features, pharmacies)` —
+  distinct routing-failure error (nothing can be certified without the
+  walking rule); panel/markers de-ranked (no band colors, verified facts
+  only).
+- Docs — `docs/ARCHITECTURE.md` §9 rewritten to the finder spec.
 
 ## Verification log
 
@@ -54,6 +65,11 @@ Step 11 in progress on `feature/candidate-recommendation`:
 2. Consistent output for 0/1/many pharmacy results.
 3. Valhalla failure degrades gracefully (direct distances + warning).
 4. Cosmetic: distances ≥ 1000 m show thousands separators in the list too.
+5. Candidate finder (step 11 replan, agreed): candidates are geometric
+   grid points, validated by the walking-distance rule (authoritative
+   gate, strict on missing routes) + road exclusion; band-based ranking
+   and OSM-site recommendations removed; routing failure shows a
+   distinct "not verified" error instead of degraded results.
 
 ## Test-discovered facts worth remembering
 
