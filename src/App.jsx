@@ -58,10 +58,6 @@ function App() {
   // array reference) invalidates the selection automatically — no
   // stale InfoWindow, no effect (derived state, as in the hook).
   const [candidateSelection, setCandidateSelection] = useState(null);
-  const selectedCandidateIndex =
-    candidateSelection && candidateSelection.forRecommendation === recommendation
-      ? candidateSelection.index
-      : null;
 
   const {
     features: geographicFeatures,
@@ -97,6 +93,13 @@ function App() {
   // A selected candidate is an index into the CURRENT recommendation.
   // A new search / clear invalidates the recommendation (reference
   // mismatch), so it also invalidates this selection — no stale window.
+  // Derived AFTER the hooks: `recommendation` is declared by the hook
+  // call above, so this must not run before it (TDZ).
+  const selectedCandidateIndex =
+    candidateSelection && candidateSelection.forRecommendation === recommendation
+      ? candidateSelection.index
+      : null;
+
   const selectedCandidate =
     recommendation && selectedCandidateIndex !== null
       ? recommendation[selectedCandidateIndex]
