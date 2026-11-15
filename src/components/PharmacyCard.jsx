@@ -57,11 +57,11 @@ function PharmacyCard({
         </div>
       </header>
 
-      <p className="pharmacy-address">
-        {pharmacy.address && pharmacy.address !== pharmacy.name
-          ? pharmacy.address
-          : "No address provided"}
-      </p>
+      {pharmacy.address && pharmacy.address !== pharmacy.name ? (
+        <p className="pharmacy-address">{pharmacy.address}</p>
+      ) : pharmacy.name === "Unnamed pharmacy" ? (
+        <p className="pharmacy-address muted">No address provided</p>
+      ) : null}
 
       <div className="pharmacy-summary">
         <span className="pharmacy-summary-item">
