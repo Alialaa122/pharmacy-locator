@@ -665,15 +665,71 @@
 
 /* Map markers ------------------------------------------------------------ */
 
-.selected-location-marker {
-  font-size: 42px;
-  line-height: 1;
+/* The pharmacy pin: a green teardrop carrying the pharmacy's rank in
+   the (walking-distance sorted) result list. */
+.pharmacy-marker {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50% 50% 50% 4px;
+  transform: rotate(-45deg);
+  background: var(--pharmacy);
+  border: 2px solid #ffffff;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.35);
   cursor: pointer;
-  filter: drop-shadow(0 2px 3px rgba(15, 23, 42, 0.35));
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
+.pharmacy-marker:hover {
+  transform: rotate(-45deg) scale(1.12);
+}
+
+.pharmacy-marker.is-selected {
+  transform: rotate(-45deg) scale(1.2);
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.3),
+    0 3px 8px rgba(15, 23, 42, 0.35);
+}
+
+.pharmacy-marker-rank {
+  transform: rotate(45deg);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* The selected location (search centre). */
+.location-marker {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.25);
+  border: 1px solid rgba(59, 130, 246, 0.6);
+  cursor: pointer;
+}
+
+.location-marker-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--map-circle);
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+}
+
+/* OSM point features: a small coloured chip around the category icon. */
 .geographic-marker {
-  font-size: 18px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.3);
+  font-size: 12px;
   line-height: 1;
   cursor: pointer;
 }
@@ -682,9 +738,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
   background: var(--candidate);
   color: #ffffff;
   font-size: 13px;
@@ -700,8 +756,8 @@
 }
 
 .candidate-marker.candidate-selected {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   font-size: 15px;
   transform: scale(1.12);
   box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.35),

@@ -8,7 +8,9 @@ import { AdvancedMarker } from "@vis.gl/react-google-maps";
 function LocationMarker({ position }) {
   return (
     <AdvancedMarker position={position}>
-      <div className="selected-location-marker">📍</div>
+      <div className="location-marker">
+        <span className="location-marker-dot" aria-hidden="true" />
+      </div>
     </AdvancedMarker>
   );
 }

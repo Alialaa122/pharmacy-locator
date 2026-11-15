@@ -5,9 +5,9 @@
  * Consumers read only what they need:
  * - osmService query builder: `overpass` selectors
  * - osmNormalize classification: `areaTag`, `amenityValue`, `highwayValue`,
- *   `areaAmenity` (matching MECHANISMS stay code; the set of categories
+ *   areaAmenity` (matching MECHANISMS stay code; the set of categories
  *   and their tag mappings live here)
- * - OsmLayer: `icon`, `polygon`
+ * - OsmLayer: `icon`, `polygon`, `mapStyle`
  * - GeographicAnalysis stats: `showInStats`, `statsLabel`
  *
  * The mapping flags:
@@ -17,6 +17,9 @@
  * - `highwayValue`: nodes tagged `highway=<value>` belong to this category
  * - `areaAmenity`:  amenity nodes that ALSO count as areas when a way is closed
  * - `polygon`:      polygon features of this category are rendered on the map
+ * - `mapStyle`:    how this category is drawn on the map — `fill`/`stroke` for
+ *                   polygons, `color` for point markers. Each feature type has
+ *                   its own hue so unrelated types never look alike.
  *
  * Registry order drives: area-tag precedence, Overpass clause order
  * (semantically irrelevant — it's a union), and the stats panel row order.
@@ -30,6 +33,12 @@ export const CATEGORIES = [
     icon: null,
     showInStats: true,
     statsLabel: "Buildings",
+    mapStyle: {
+      fill: "#f59e0b",
+      fillOpacity: 0.28,
+      stroke: "#b45309",
+      strokeWeight: 1,
+    },
   },
 
   {
@@ -40,6 +49,12 @@ export const CATEGORIES = [
     icon: null,
     showInStats: false,
     statsLabel: null,
+    mapStyle: {
+      fill: "#14b8a6",
+      fillOpacity: 0.2,
+      stroke: "#0f766e",
+      strokeWeight: 1,
+    },
   },
 
   {
@@ -50,6 +65,12 @@ export const CATEGORIES = [
     icon: null,
     showInStats: false,
     statsLabel: null,
+    mapStyle: {
+      fill: "#14b8a6",
+      fillOpacity: 0.16,
+      stroke: "#0f766e",
+      strokeWeight: 1,
+    },
   },
 
   {
@@ -58,6 +79,11 @@ export const CATEGORIES = [
     icon: null,
     showInStats: true,
     statsLabel: "Roads",
+    mapStyle: {
+      stroke: "#475569",
+      strokeWeight: 2.5,
+      strokeOpacity: 0.85,
+    },
   },
 
   {
@@ -67,6 +93,7 @@ export const CATEGORIES = [
     icon: "🏫",
     showInStats: true,
     statsLabel: "Schools",
+    mapStyle: { color: "#2563eb" },
   },
 
   {
@@ -76,6 +103,7 @@ export const CATEGORIES = [
     icon: "🏥",
     showInStats: true,
     statsLabel: "Hospitals",
+    mapStyle: { color: "#dc2626" },
   },
 
   {
@@ -84,6 +112,7 @@ export const CATEGORIES = [
     icon: "🏧",
     showInStats: true,
     statsLabel: "ATMs",
+    mapStyle: { color: "#4f46e5" },
   },
 
   {
@@ -93,6 +122,7 @@ export const CATEGORIES = [
     icon: "🚌",
     showInStats: true,
     statsLabel: "Bus Stops",
+    mapStyle: { color: "#0d9488" },
   },
 
   {
@@ -101,31 +131,35 @@ export const CATEGORIES = [
     icon: "💊",
     showInStats: false,
     statsLabel: null,
+    mapStyle: { color: "#16a34a" },
   },
 
   {
     id: "clinic",
     amenityValue: true,
-    icon: null,
+    icon: "✚",
     showInStats: false,
     statsLabel: null,
+    mapStyle: { color: "#db2777" },
   },
 
   {
     id: "university",
     amenityValue: true,
     areaAmenity: true,
-    icon: null,
+    icon: "🎓",
     showInStats: false,
     statsLabel: null,
+    mapStyle: { color: "#7c3aed" },
   },
 
   {
     id: "kindergarten",
     amenityValue: true,
-    icon: null,
+    icon: "🧸",
     showInStats: false,
     statsLabel: null,
+    mapStyle: { color: "#ea580c" },
   },
 
   {
@@ -133,6 +167,7 @@ export const CATEGORIES = [
     icon: null,
     showInStats: false,
     statsLabel: null,
+    mapStyle: { color: "#64748b" },
   },
 ];
 
