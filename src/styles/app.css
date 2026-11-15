@@ -703,6 +703,153 @@
   line-height: 1.55;
 }
 
+.candidate-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  text-align: center;
+}
+
+.candidate-summary-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.candidate-summary-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.candidate-summary-label {
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.constraint-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.constraint-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.constraint-mark {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  flex: none;
+  margin-top: 1px;
+}
+
+.constraint-mark.is-pass {
+  background: var(--success);
+}
+
+.constraint-text strong {
+  color: var(--text-strong);
+}
+
+.constraint-detail {
+  color: var(--text-muted);
+}
+
+.rejected-section {
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.rejected-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.rejected-header h3 {
+  font-size: 13px;
+  color: var(--text-strong);
+}
+
+.rejected-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.rejected-toggle input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.rejected-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rejected-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.rejected-count {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rejected-marker {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.35);
+  border: 2px solid #94a3b8;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+}
+
 .candidate-card {
   padding: 12px 14px;
   margin-bottom: 8px;

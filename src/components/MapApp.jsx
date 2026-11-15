@@ -52,6 +52,7 @@ function MapApp({ apiKey }) {
   const [layerVisibility, setLayerVisibility] = useState(
     DEFAULT_LAYER_VISIBILITY
   );
+  const [showRejectedCandidates, setShowRejectedCandidates] = useState(false);
   // { forRecommendation, index } — bound to the exact recommendation
   // array it came from, so a new search / new recommendation (a new
   // array reference) invalidates the selection automatically — no
@@ -66,6 +67,8 @@ function MapApp({ apiKey }) {
 
   const {
     recommendation,
+    summary: candidateSummary,
+    rejected: rejectedCandidates,
     isLoading: isFinding,
     error: findError,
     find,
@@ -179,6 +182,12 @@ function MapApp({ apiKey }) {
         <CandidatesPanel
           canRecommend={canRecommend}
           recommendation={recommendation}
+          summary={candidateSummary}
+          rejected={rejectedCandidates}
+          showRejected={showRejectedCandidates}
+          onToggleShowRejected={() =>
+            setShowRejectedCandidates((value) => !value)
+          }
           isLoading={isFinding}
           error={findError}
           selectedCandidateIndex={selectedCandidateIndex}
@@ -254,6 +263,8 @@ function MapApp({ apiKey }) {
 
                 <CandidateMarkers
                   recommendation={recommendation}
+                  rejected={rejectedCandidates}
+                  showRejected={showRejectedCandidates}
                   selectedCandidateIndex={selectedCandidateIndex}
                   onSelectCandidate={handleSelectCandidate}
                 />

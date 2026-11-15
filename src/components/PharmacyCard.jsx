@@ -57,7 +57,11 @@ function PharmacyCard({
         </div>
       </header>
 
-      <p className="pharmacy-address">{pharmacy.address}</p>
+      <p className="pharmacy-address">
+        {pharmacy.address && pharmacy.address !== pharmacy.name
+          ? pharmacy.address
+          : "No address provided"}
+      </p>
 
       <div className="pharmacy-summary">
         <span className="pharmacy-summary-item">
