@@ -17,24 +17,35 @@ with `node src/services/test-overpass.js`.
   a locally provided key — don't hardcode it in source.
 
 ## Architecture
-Single-page pharmacy locator. The agreed architecture lives in
-`docs/ARCHITECTURE.md`; the layout (post-refactor):
-- `App.jsx` — shared state + composition only.
+Two screens — a landing page (`/`) and the map application (`/app`).
+The agreed architecture lives in `docs/ARCHITECTURE.md` (§10 covers the
+UI redesign); the layout:
+- `src/App.jsx` — route shell only; `src/router.jsx` — minimal
+  History-API router (no routing dependency).
+- `src/components/MapApp.jsx` — shared state + composition only.
 - `src/lib/` — pure helpers: `geo.js` (haversine, coordinate conversion),
   `format.js` (display formatting), `categories.js` (data-only OSM category
-  registry — add new categories here, one entry).
-- `src/domain/pharmacyResults.js` — pure assembler producing the pharmacy
-  result list (plain data only, no SDK objects).
+  registry — add new categories here, one entry), `layers.js` (data-only
+  layer-group registry), `geographicCache.js` (session cache for the OSM
+  features of an area).
+- `src/domain/` — pure modules: `pharmacyResults.js` (assembler for the
+  pharmacy result list), `candidates.js` (the candidate finder),
+  `analysis.js` (area statistics), `eligibility.js` (the EDA verdict).
 - `src/services/` — one module per external provider: `placesService.js`
   (Google Places), `routingService.js` (Valhalla walking matrix),
   `osmService.js` (Overpass fetch/query — hits a **personal
   `overpass.nextgis.com` mirror**, not public `overpass-api.de`) and
   `osmNormalize.js` (raw OSM → uniform feature shape).
-- `src/hooks/useGeographicFeatures.js` — Overpass request state.
+- `src/hooks/` — `useGeographicFeatures.js` (Overpass request state +
+  cache) and `useCandidateRecommendation.js` (finder orchestration).
 - `src/components/` — `PharmacySearch` (pipeline orchestrator),
-  `map/OsmLayer.jsx`, plus panels. Google Maps rendering (`@vis.gl/...`)
+  `SidePanel`, `SearchPanel`, `LayersControl`, `PharmacyResultsPanel`,
+  `PharmacyCard`, `CandidatesPanel`, `GeographicAnalysis`,
+  `VerdictChip`, plus `map/`. Google Maps rendering (`@vis.gl/...`)
   is used directly by map components only; `useMapsLibrary("places")` in
   `PharmacySearch`.
+- `src/styles/` — `index.css` (tokens + base), `landing.css`,
+  `app.css`.
 
 ## Refactoring Workflow
 The agreed target architecture lives in `docs/ARCHITECTURE.md` — read it before

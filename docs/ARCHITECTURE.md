@@ -1,30 +1,48 @@
 # Architecture — Pharmacy Locator
 
-> **Status:** prototype (`prototype-v1` tag). Client-only application: no backend, no database,
+> **Status:** prototype. Client-only application: no backend, no database,
 > no server-side rendering. Steps 1–11 of the implementation plan are done
 > (step 11 = the Geographic Candidate Finder, which replaced the earlier
 > OSM-site recommender — see `docs/PROGRESS.md`).
-> The "Current Architecture" below describes the post-refactor state.
+> The UI was redesigned on the `feature/ui-redesign` branch: a landing
+> page, a tabbed application shell, opt-in map layers, a grouped analysis
+> panel and a candidate finder that reports every check it made.
+> See **§10** for the redesign and its deliberate behaviour changes.
 
 ## 1. Current Architecture (as implemented after the refactor)
 
 ```
-App.jsx (~170 lines) — shared state (pharmacies, selectedPharmacy,
-  selectedLocation, searchRadius, hasSearched) + composition
-  ├─ PharmacySearch (components/)    — orchestrates the search pipeline
-  │     via placesService + routingService + domain/pharmacyResults
-  ├─ MapClickHandler (inline in App) — useMap() click listener
-  ├─ OsmLayer (components/map/)      — OSM overlays, dispatch by geometryType
-  ├─ inline overlays                 — InfoWindow, location marker, Circle,
-  │                                    pharmacy markers (move out in step 9)
-  ├─ PharmacyList                    — display only, formatted via lib/format
-  └─ GeographicAnalysis              — display only, registry-driven stats
+App.jsx — router shell: "/" renders the landing page, "/app" the map app
+router.jsx — minimal History-API router (two routes, no dependency)
+components/
+  LandingPage · AppHeader — the landing page and the shared header
+  MapApp — owns the shared state (pharmacies, selectedPharmacy,
+    selectedLocation, selectedCity, searchRadius, hasSearched,
+    activeTab, panelCollapsed, layerVisibility, showRejectedCandidates)
+    ├─ SidePanel              — tabs (Results / Analysis / Candidates),
+    │                           collapsible to focus the map
+    ├─ SearchPanel            — floating card over the map
+    ├─ LayersControl          — floating layer panel over the map
+    ├─ VerdictChip            — compact verdict over the map
+    ├─ PharmacySearch         — orchestrates the search pipeline via
+    │                           placesService + routingService
+    ├─ PharmacyResultsPanel   — display only, formatted via lib/format
+    ├─ CandidatesPanel        — display only, finder results + checks
+    ├─ GeographicAnalysis     — display only, stats from domain/analysis
+    └─ map/                   — ALL @vis.gl usage lives here:
+        GoogleMap · CityMapMover · MapClickHandler · SearchCircle ·
+        LocationMarker · PharmacyMarkers · PharmacyInfoWindow ·
+        CandidateMarkers · CandidateInfoWindow · OsmLayer
 
 lib/        geo.js (haversine, coordinate conversion) · format.js ·
-            categories.js (data-only registry)
-domain/     pharmacyResults.js (pure assembler)
+            categories.js (data-only registry) · layers.js (layer
+            registry) · geographicCache.js (session cache) · cities.js
+domain/     pharmacyResults.js (pure assembler) · candidates.js (pure
+            finder) · analysis.js (pure statistics) · eligibility.js
 services/   placesService · routingService · osmService · osmNormalize
-hooks/      useGeographicFeatures (Overpass fetch + request state)
+hooks/      useGeographicFeatures (Overpass fetch + cache) ·
+            useCandidateRecommendation (finder orchestration)
+styles/     index.css (tokens + base) · landing.css · app.css
 ```
 
 Google SDK objects never cross service boundaries; units are meters/seconds
@@ -41,14 +59,21 @@ UI components ──▶ hooks ──▶ domain (pure) ──▶ services ──�
 
 ```
 src/
-├── lib/        geo.js · format.js · categories.js · cities.js
-├── domain/     pharmacyResults.js · candidates.js
-│                     (pure result assembly · pure recommendation ranking)
+├── lib/        geo.js · format.js · categories.js · layers.js
+│               cities.js · geographicCache.js
+├── domain/     pharmacyResults.js · candidates.js · analysis.js
+│                     (pure assembly · pure finder · pure statistics)
 ├── services/   placesService · routingService · osmService · osmNormalize
-├── hooks/      useGeographicFeatures · usePharmacySearch
-├── components/ map/(MapCanvas · OsmLayer · PharmacyMarkers)
-│               SearchPanel · PharmacyList · GeographicAnalysis
-└── App.jsx     state + composition only
+├── hooks/      useGeographicFeatures · useCandidateRecommendation
+├── components/ LandingPage · MapApp · SidePanel · SearchPanel
+│               LayersControl · VerdictChip · PharmacyResultsPanel
+│               PharmacyCard · CandidatesPanel · LocationVerdict
+│               map/(MapClickHandler · SearchCircle · LocationMarker
+│                   PharmacyMarkers · CandidateMarkers · InfoWindows
+│                   OsmLayer · CityMapMover)
+├── styles/     index.css · landing.css · app.css
+├── router.jsx  minimal client-side router
+└── App.jsx     route shell only
 ```
 
 ## 3. Responsibilities and Boundaries
@@ -332,3 +357,112 @@ effort "this spot", not a legal address or door position; the
 filter is a follow-up if it over-rejects); the 100 m walking rule
 is a product assumption, pending regulatory verification.
 
+
+## 10. UI redesign (`feature/ui-redesign`)
+
+The interface was redesigned around two screens: a landing page that
+explains the product, and a map application. The rules below are the
+agreed target; the ones marked **(behaviour change)** differ from the
+previous build and are deliberate.
+
+### 10.1 Routes
+
+| Route | Screen |
+|---|---|
+| `/` | Landing page — hero, how it works, the three capabilities, final CTA |
+| `/app` | The map application |
+
+`src/router.jsx` is a minimal History-API router (two routes, no
+dependency). Unknown paths fall back to the landing page.
+
+### 10.2 Application shell
+
+- The map fills the viewport; the side panel holds one tab at a time
+  (**Results / Analysis / Candidates**) so the panels never compete for
+  attention. The panel can be collapsed to focus the map.
+- The search controls, the layer control and the verdict chip float
+  **over** the map; they are contextual to it, not a competing column.
+- No state library: `MapApp` holds the shared state with `useState`,
+  exactly as `App.jsx` did before.
+
+### 10.3 Layer visibility (behaviour change)
+
+The map now starts **clean**: nothing is drawn until its layer is
+enabled. Layers are grouped (Pharmacies, Areas, Transportation,
+Buildings, Facilities, Points of interest) and every group toggles
+independently.
+
+- The groups live in `lib/layers.js` (data-only registry) and map to
+  the OSM categories of `lib/categories.js`.
+- **Visibility is a view concern only.** The features are loaded when a
+  location is selected, whatever is visible; hiding a layer never
+  triggers a request, and the analysis keeps counting the hidden data.
+- The OSM data for a group is unchanged: all of it still arrives in the
+  single Overpass request.
+- Administrative **boundaries are not included** — they would need a
+  new Overpass selector and are a separate decision.
+
+### 10.4 Geographic analysis (behaviour change)
+
+`domain/analysis.js` (pure) computes the statistics from the loaded
+features. The panel groups them like the layer panel and breaks each
+group down by its OSM type (buildings by type, roads by class, land
+use by value, facilities and POIs by category), with readable labels.
+
+- The numbers are derived, never stored, and independent of the layer
+  visibility.
+- `categories.js` lost `showInStats`; every category now carries a
+  `statsLabel` and a `mapStyle` (fill/stroke for polygons, chip
+  colour for points).
+- **Amenity footprints are now classified by their amenity** (behaviour
+  change): a closed way tagged `amenity=school` used to be filed under
+  the generic `amenity` category, which undercounted the facilities
+  and put their footprints in the wrong layer. Building and land use
+  still win over an amenity tag.
+
+### 10.5 Session cache
+
+`lib/geographicCache.js` keeps the OSM features of an area for the
+session, so re-visiting an area costs no request. The cache is keyed by
+centre **and radius**: a larger cached area is not reused for a
+smaller radius, because that would leak features outside the requested
+circle into the statistics.
+
+### 10.6 Candidate finder telemetry (behaviour change)
+
+The finder now reports what it did. `domain/candidates.js` gained
+`partition*` variants of the checks: they return the points that
+passed **and** the points that were rejected, each with a reason
+(`on_road`, `too_close`, `walking_gate`, `no_route`). The hook
+returns a summary (generated / valid / rejected / not checked) and the
+rejected candidates; the panel shows the counts, the result of each
+rule, and — on request — the rejected spots on the map.
+
+- The constraint logic and the order of the checks are **unchanged**.
+- Points dropped by the routing budget are counted as **not checked**,
+  never as rejected.
+- The wording stays geographic: the candidates are valid spots, never
+  a ranking, and no commercial factor is introduced.
+
+### 10.7 Pharmacy results
+
+- The card shows the rank (the same number as the map marker), the
+  name, the address, the walking distance and — when expanded — every
+  measurement with a sentence explaining it.
+- A missing measurement stays **"Unavailable"**; it is never shown as
+  zero.
+- The nearest pharmacy carries a badge, and a compact verdict chip
+  sits over the map so the answer is visible whatever tab is open.
+- A place without a display name falls back to its address
+  (`domain/pharmacyResults.js`), so no card shows an empty title.
+
+### 10.8 Visual system
+
+- Design tokens (colours, spacing, radii, shadows, typography) live in
+  `styles/index.css`; the app styles in `styles/app.css`, the landing
+  styles in `styles/landing.css`.
+- Every feature type has its own hue: buildings amber, areas teal,
+  roads slate, facilities and POIs coloured chips, pharmacies green
+  pins, candidates violet. The search circle is blue, the location a
+  blue dot.
+- No new dependencies: the markers are plain CSS.
