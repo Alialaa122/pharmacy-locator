@@ -2,7 +2,8 @@ import { useState } from "react";
 import { APIProvider, Map as GoogleMap } from "@vis.gl/react-google-maps";
 import AppHeader from "./AppHeader.jsx";
 import SidePanel from "./SidePanel.jsx";
-import PharmacyList from "../PharmacyList.jsx";
+import PharmacyResultsPanel from "./PharmacyResultsPanel.jsx";
+import VerdictChip from "./VerdictChip.jsx";
 import GeographicAnalysis from "../GeographicAnalysis.jsx";
 import SearchPanel from "./SearchPanel.jsx";
 import CandidatesPanel from "./CandidatesPanel.jsx";
@@ -147,8 +148,9 @@ function MapApp({ apiKey }) {
       label: "Results",
       badge: hasSearched ? pharmacies.length : null,
       content: (
-        <PharmacyList
+        <PharmacyResultsPanel
           pharmacies={pharmacies}
+          selectedPharmacyId={selectedPharmacy?.id ?? null}
           onSelectPharmacy={setSelectedPharmacy}
           searchRadius={searchRadius}
           hasSearched={hasSearched}
@@ -273,6 +275,11 @@ function MapApp({ apiKey }) {
               visibility={layerVisibility}
               onToggle={handleToggleLayer}
               hasData={geographicFeatures.length > 0}
+            />
+
+            <VerdictChip
+              pharmacies={pharmacies}
+              hasSearched={hasSearched}
             />
           </main>
         </div>
