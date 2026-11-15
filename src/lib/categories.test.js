@@ -42,7 +42,7 @@ describe("categories registry", () => {
     }
   });
 
-  it("the icon set matches what the map has always shown", () => {
+  it("every category the map draws has an icon", () => {
     const icons = Object.fromEntries(
       CATEGORIES.filter((category) => category.icon).map((category) => [
         category.id,
@@ -56,7 +56,16 @@ describe("categories registry", () => {
       atm: "🏧",
       bus_stop: "🚌",
       pharmacy: "💊",
+      clinic: "✚",
+      university: "🎓",
+      kindergarten: "🧸",
     });
+  });
+
+  it("every category carries a map style", () => {
+    for (const category of CATEGORIES) {
+      expect(category.mapStyle, category.id).toBeTruthy();
+    }
   });
 
   it("getCategory returns null for unknown ids", () => {
