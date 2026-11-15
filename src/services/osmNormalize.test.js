@@ -43,12 +43,12 @@ describe("normalizeOsmElements — fixture (real Overpass response)", () => {
     }
 
     expect(byCategory).toEqual({
-      school: 2,
-      hospital: 1,
+      school: 3,
+      hospital: 2,
+      university: 1,
       atm: 3,
       road: 239,
       landuse: 65,
-      amenity: 3,
       building: 184,
     });
 
@@ -138,6 +138,38 @@ describe("normalizeOsmElements — way classification", () => {
     ]);
 
     expect(features).toHaveLength(0);
+  });
+
+  it("classifies an amenity footprint as that amenity, not as a generic area", () => {
+    // A school drawn as a closed way is a school: it must be counted as
+    // one, and it must belong to the facilities layer.
+    const [feature] = normalizeOsmElements([
+      way(14, ringNodeIds, { amenity: "school", name: "Test School" }, ringPoints),
+    ]);
+
+    expect(feature.category).toBe("school");
+    expect(feature.geometryType).toBe("Polygon");
+  });
+
+  it("still prefers building over a specific amenity", () => {
+    const [feature] = normalizeOsmElements([
+      way(
+        15,
+        ringNodeIds,
+        { amenity: "school", building: "yes" },
+        ringPoints
+      ),
+    ]);
+
+    expect(feature.category).toBe("building");
+  });
+
+  it("keeps land use areas in the land use category", () => {
+    const [feature] = normalizeOsmElements([
+      way(16, ringNodeIds, { landuse: "residential" }, ringPoints),
+    ]);
+
+    expect(feature.category).toBe("landuse");
   });
 
   it("resolves way coordinates from its own geometry array, ignoring node references", () => {
