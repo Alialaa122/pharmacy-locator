@@ -71,11 +71,16 @@ function App() {
 
   const {
     recommendation,
-    isLoading: isRecommending,
-    error: recommendError,
-    recommend,
+    isLoading: isFinding,
+    error: findError,
+    find,
     clear: clearRecommendation,
-  } = useCandidateRecommendation(geographicFeatures, pharmacies);
+  } = useCandidateRecommendation(
+    selectedLocation,
+    searchRadius,
+    geographicFeatures,
+    pharmacies
+  );
 
   const geographicStats = CATEGORIES.filter(
     (category) => category.showInStats
@@ -212,34 +217,18 @@ function App() {
               <div className="candidate-window">
                 <h3>
                   {recommendation.indexOf(selectedCandidate) + 1}.{" "}
-                  {selectedCandidate.label}
+                  Candidate spot
                 </h3>
                 <p>
-                  <strong>
-                    {selectedCandidate.kind === "building"
-                      ? "Building"
-                      : "Road"}
-                    {selectedCandidate.walkingVerified &&
-                    selectedCandidate.band
-                      ? ` · ${selectedCandidate.band.label}`
-                      : selectedCandidate.walkingVerified
-                        ? ""
-                        : " · walking unverified"}
-                  </strong>
+                  Walking distance to nearest competitor:{" "}
+                  {formatDistance(
+                    selectedCandidate.walkingSeparationMeters
+                  )}
                 </p>
                 <p>
-                  {selectedCandidate.separationBasis === "walking"
-                    ? "Separation (walking):"
-                    : "Separation (straight-line):"}{" "}
-                  {formatDistance(selectedCandidate.separationMeters)}
+                  Nearest competitor:{" "}
+                  {selectedCandidate.nearestPharmacyName}
                 </p>
-                {selectedCandidate.walkingVerified &&
-                  selectedCandidate.nearestCompetition && (
-                    <p>
-                      Nearest competitor:{" "}
-                      {selectedCandidate.nearestCompetition.name}
-                    </p>
-                  )}
                 <small>
                   {selectedCandidate.lat.toFixed(5)},{" "}
                   {selectedCandidate.lng.toFixed(5)}
@@ -269,10 +258,10 @@ function App() {
             !isGeographicLoading
           }
           recommendation={recommendation}
-          isLoading={isRecommending}
-          error={recommendError}
+          isLoading={isFinding}
+          error={findError}
           selectedCandidateIndex={selectedCandidateIndex}
-          onRecommend={recommend}
+          onFind={find}
           onClear={handleClearRecommendation}
           onSelectCandidate={handleSelectCandidate}
         />

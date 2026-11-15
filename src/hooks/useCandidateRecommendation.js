@@ -1,19 +1,21 @@
 import { useState, useRef } from "react";
 import {
-  buildCandidateSites,
-  prefilterCandidates,
-  rankCandidates,
+  generateCandidatePoints,
+  filterOffRoad,
+  filterFarEnough,
+  budgetCandidates,
+  applyWalkingGate,
+  selectDistinctCandidates,
 } from "../domain/candidates.js";
 import { getWalkingMatrix } from "../services/routingService.js";
 
 /**
- * Orchestrates the candidate recommendation pipeline for the current
- * search results:
+ * Orchestrates the geographic candidate finder for the current search:
  *
- *   features + pharmacies  →  recommend()  →  recommendation (top 3)
+ *   location + radius + features + pharmacies → find() → top 3 valid
  *
- * The routing call (Valhalla) is the ONLY thing that happens here; all
- * rule logic lives in `domain/candidates.js`.
+ * The Valhalla matrix call is the ONLY network step here; all rule
+ * logic lives in `domain/candidates.js`.
  *
  * A recommendation is tied to the search result set it was computed
  * for: the stored result is matched by reference against the current
@@ -21,19 +23,32 @@ import { getWalkingMatrix } from "../services/routingService.js";
  * produce a new array reference) automatically invalidates it — no
  * effect, no stale state.
  *
- * @param {Array<object>} features - normalized OSM features for the
- *   selected location/radius (from useGeographicFeatures)
+ * Routing failure (Valhalla unreachable) is surfaced as its OWN
+ * error state — the walking rule is the authoritative rule and
+ * candidates can never be certified without it. Individual missing
+ * routes (null cells) are NOT this error: they strictly invalidate
+ * the affected candidate inside domain/candidates.js.
+ *
+ * @param {{ lat: number, lng: number } | null} selectedLocation
+ * @param {number} searchRadius - meters
+ * @param {Array<object>} features - normalized OSM features (road
+ *   sources for the exclusion check)
  * @param {Array<object>} pharmacies - current pharmacy search results
  * @returns {{
  *   recommendation: Array | null,   // null = not computed / invalidated;
- *                                    // [] = ran, none eligible
+ *                                    // [] = ran, none valid
  *   isLoading: boolean,
  *   error: string,
- *   recommend: () => void,
+ *   find: () => void,
  *   clear: () => void,
  * }}
  */
-export function useCandidateRecommendation(features, pharmacies) {
+export function useCandidateRecommendation(
+  selectedLocation,
+  searchRadius,
+  features,
+  pharmacies
+) {
   // { forPharmacies, candidates } — the stored answer is only "live"
   // while forPharmacies IS the current pharmacy array.
   const [result, setResult] = useState(null);
@@ -49,19 +64,22 @@ export function useCandidateRecommendation(features, pharmacies) {
     setIsLoading(false);
   }
 
-  async function recommend() {
+  async function find() {
     const requestId = ++requestIdRef.current;
 
     setIsLoading(true);
     setError("");
 
     try {
-      const candidates = prefilterCandidates(
-        buildCandidateSites(features),
-        pharmacies
-      );
+      const points = generateCandidatePoints(selectedLocation, searchRadius);
+      const offRoad = filterOffRoad(points, features);
+      const survivable = filterFarEnough(offRoad, pharmacies);
+      const budgeted = budgetCandidates(survivable);
 
-      if (candidates.length === 0) {
+      // Zero survivable candidates — the straight-line rule and the
+      // road check already rejected everything. No routing needed;
+      // walking could only reject more (walking ≥ straight-line).
+      if (budgeted.length === 0) {
         storeResult([]);
         return;
       }
@@ -69,22 +87,32 @@ export function useCandidateRecommendation(features, pharmacies) {
       let matrix;
 
       try {
-        matrix = await getWalkingMatrix(candidates, pharmacies);
+        matrix = await getWalkingMatrix(budgeted, pharmacies);
       } catch {
-        // Agreed (ARCHITECTURE.md §9): routing failure degrades
-        // gracefully — rank by straight-line separation, flagged
-        // walkingVerified: false.
-        matrix = candidates.map(() => []);
+        // The walking rule is authoritative: without routes nothing
+        // can be certified. A distinct error — not an empty result —
+        // because "no valid spots" and "could not be measured" are
+        // different situations.
+        if (requestId === requestIdRef.current) {
+          setError(
+            "Walking distances are unavailable, so candidates could not be verified. Please try again."
+          );
+          setIsLoading(false);
+        }
+
+        return;
       }
 
       if (requestId !== requestIdRef.current) {
         return; // superseded by a newer action
       }
 
-      storeResult(rankCandidates(candidates, matrix, pharmacies));
+      storeResult(
+        selectDistinctCandidates(applyWalkingGate(budgeted, matrix, pharmacies))
+      );
     } catch {
       if (requestId === requestIdRef.current) {
-        setError("Recommendation failed. Please try again.");
+        setError("Candidate search failed. Please try again.");
         setIsLoading(false);
       }
     }
@@ -97,5 +125,5 @@ export function useCandidateRecommendation(features, pharmacies) {
     setIsLoading(false);
   }
 
-  return { recommendation, isLoading, error, recommend, clear };
+  return { recommendation, isLoading, error, find, clear };
 }

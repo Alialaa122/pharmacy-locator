@@ -1,7 +1,7 @@
 import { AdvancedMarker } from "@vis.gl/react-google-maps";
 
 /**
- * Numbered map markers for the recommended candidate spots.
+ * Numbered map markers for the valid candidate spots.
  * Plain data in ({ recommendation, onSelect }) — owns all @vis.gl
  * usage. Clicking a marker selects that spot (App opens its window).
  *
@@ -24,9 +24,9 @@ function CandidateMarkers({
     <>
       {recommendation.map((candidate, index) => (
         <AdvancedMarker
-          key={`${candidate.id}-${index}`}
+          key={candidate.id}
           position={{ lat: candidate.lat, lng: candidate.lng }}
-          title={`${index + 1}. ${candidate.label}`}
+          title={`Candidate ${index + 1}`}
           onClick={() => onSelectCandidate(index)}
         >
           <div
@@ -35,9 +35,6 @@ function CandidateMarkers({
                 ? "candidate-marker candidate-selected"
                 : "candidate-marker"
             }
-            style={{
-              backgroundColor: candidate.band?.color ?? "#6b7280",
-            }}
           >
             {index + 1}
           </div>

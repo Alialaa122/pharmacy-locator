@@ -1,16 +1,18 @@
 import { formatDistance } from "../lib/format.js";
 
 /**
- * Display-only candidate recommendation panel: the trigger button and
- * the top-3 results. Plain data in, callbacks out — no pipeline logic.
+ * Display-only geographic candidate finder panel: the trigger button
+ * and up to 3 verified valid candidates. No commercial ranking — the
+ * candidates are all equally "valid" (both constraints pass); they are
+ * just mutually distinct spots.
  *
  * @param {{
- *   canRecommend: boolean,      // a search result set exists to recommend against
- *   recommendation: Array | null, // null = not run; [] = ran, none eligible
+ *   canRecommend: boolean,      // a search result set exists to find against
+ *   recommendation: Array | null, // null = not run; [] = ran, none valid
  *   isLoading: boolean,
  *   error: string,
  *   selectedCandidateIndex: number | null,
- *   onRecommend: () => void,
+ *   onFind: () => void,
  *   onClear: () => void,
  *   onSelectCandidate: (index: number) => void,
  * }} props
@@ -21,7 +23,7 @@ function CandidatesPanel({
   isLoading,
   error,
   selectedCandidateIndex,
-  onRecommend,
+  onFind,
   onClear,
   onSelectCandidate,
 }) {
@@ -29,27 +31,29 @@ function CandidatesPanel({
 
   return (
     <div className="candidates-panel">
-      <h2>Recommended Spots</h2>
+      <h2>Location Finder</h2>
 
       <button
         className="recommend-button"
-        onClick={onRecommend}
+        onClick={onFind}
         disabled={!canRecommend || isLoading}
       >
-        {isLoading ? "Analyzing..." : "Recommend locations"}
+        {isLoading ? "Checking locations..." : "Search for locations"}
       </button>
 
       <p className="candidates-note">
-        Spots at least 100 m (straight-line) from every found pharmacy,
-        ranked by walking separation. Click a spot to see its details.
+        Finds up to 3 valid spots inside your selected radius — at
+        least 100 m walking distance from every found pharmacy and not
+        on a road — each at least 200 m from the others.
       </p>
 
       {error && <p className="error-message">{error}</p>}
 
       {hasRun && recommendation.length === 0 && (
         <p className="candidates-empty">
-          No compliant spots in this radius — every building and street
-          here is within 100 m of an existing pharmacy.
+          No valid spots found in this radius — all checked locations
+          were either on a road or too close (straight-line) to an
+          existing pharmacy.
         </p>
       )}
 
@@ -60,54 +64,33 @@ function CandidatesPanel({
               ? "candidate-card candidate-selected"
               : "candidate-card"
           }
-          key={`${candidate.id}-${index}`}
+          key={candidate.id}
           onClick={() => onSelectCandidate(index)}
-          style={{
-            borderLeftColor: candidate.band?.color ?? "#e5e7eb",
-          }}
         >
           <div className="candidate-header">
-            <span
-              className="candidate-rank"
-              style={{
-                backgroundColor: candidate.band?.color ?? "#6b7280",
-              }}
-            >
-              {index + 1}
-            </span>
-            <h3>{candidate.label}</h3>
+            <span className="candidate-rank">{index + 1}</span>
+            <h3>Candidate spot</h3>
           </div>
 
           <p className="candidate-kind">
-            {candidate.kind === "building" ? "Building" : "Road"}
-            {candidate.walkingVerified
-              ? candidate.band
-                ? ` · ${candidate.band.label}`
-                : ""
-              : " · walking unverified"}
+            Verified: 100+ m walking distance from all pharmacies
           </p>
 
           <p>
-            <strong>
-              {candidate.separationBasis === "walking"
-                ? "Separation (walking)"
-                : "Separation (straight-line)"}:
-            </strong>{" "}
-            {formatDistance(candidate.separationMeters)}
+            <strong>Nearest competitor (walking):</strong>{" "}
+            {formatDistance(candidate.walkingSeparationMeters)}
           </p>
 
-          {candidate.walkingVerified && candidate.nearestCompetition && (
-            <p>
-              <strong>Nearest competitor:</strong>{" "}
-              {candidate.nearestCompetition.name}
-            </p>
-          )}
+          <p>
+            <strong>Closest pharmacy:</strong>{" "}
+            {candidate.nearestPharmacyName}
+          </p>
         </div>
       ))}
 
       {hasRun && recommendation.length > 0 && (
         <button className="clear-recommendation" onClick={onClear}>
-          Clear recommendation
+          Clear results
         </button>
       )}
     </div>
