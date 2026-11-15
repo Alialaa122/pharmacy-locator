@@ -1,0 +1,286 @@
+import { useState, useEffect } from "react";
+import {
+  APIProvider,
+  Map as GoogleMap,
+  AdvancedMarker,
+  InfoWindow,
+  useMap,
+  Circle
+} from "@vis.gl/react-google-maps";
+import AppHeader from "./AppHeader.jsx";
+import PharmacyList from "../PharmacyList.jsx";
+import GeographicAnalysis from "../GeographicAnalysis.jsx";
+import SearchPanel from "./SearchPanel.jsx";
+import CandidatesPanel from "./CandidatesPanel.jsx";
+import OsmLayer from "./map/OsmLayer.jsx";
+import CityMapMover from "./map/CityMapMover.jsx";
+import CandidateMarkers from "./map/CandidateMarkers.jsx";
+import { useGeographicFeatures } from "../hooks/useGeographicFeatures.js";
+import { useCandidateRecommendation } from "../hooks/useCandidateRecommendation.js";
+import { CATEGORIES } from "../lib/categories.js";
+import { DEFAULT_CITY } from "../lib/cities.js";
+import { formatDistance } from "../lib/format.js";
+import { ROUTES } from "../router.jsx";
+
+function MapClickHandler({ onLocationSelect }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    const listener = map.addListener("click", (event) => {
+      const location = {
+        lat: event.latLng.lat(),
+        lng: event.latLng.lng(),
+      };
+
+      onLocationSelect(location);
+    });
+
+    return () => listener.remove();
+  }, [map, onLocationSelect]);
+
+  return null;
+}
+
+/**
+ * The map application: owns the shared application state (pharmacies,
+ * selected location, radius, candidate selection) and composes the
+ * panels and the map.
+ *
+ * @param {{ apiKey: string }} props
+ */
+function MapApp({ apiKey }) {
+  const [pharmacies, setPharmacies] = useState([]);
+  const [selectedPharmacy, setSelectedPharmacy] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [selectedCity, setSelectedCity] = useState(DEFAULT_CITY);
+  const [searchRadius, setSearchRadius] = useState(1000);
+  const [hasSearched, setHasSearched] = useState(false);
+  // { forRecommendation, index } — bound to the exact recommendation
+  // array it came from, so a new search / new recommendation (a new
+  // array reference) invalidates the selection automatically — no
+  // stale InfoWindow, no effect (derived state, as in the hook).
+  const [candidateSelection, setCandidateSelection] = useState(null);
+
+  const {
+    features: geographicFeatures,
+    isLoading: isGeographicLoading,
+    error: geographicError,
+  } = useGeographicFeatures(selectedLocation, searchRadius);
+
+  const {
+    recommendation,
+    isLoading: isFinding,
+    error: findError,
+    find,
+    clear: clearRecommendation,
+  } = useCandidateRecommendation(
+    selectedLocation,
+    searchRadius,
+    geographicFeatures,
+    pharmacies
+  );
+
+  const geographicStats = CATEGORIES.filter(
+    (category) => category.showInStats
+  ).map((category) => ({
+    id: category.id,
+    label: category.statsLabel,
+    count: geographicFeatures.filter(
+      (feature) => feature.category === category.id
+    ).length,
+  }));
+
+  // A selected candidate is an index into the CURRENT recommendation.
+  // A new search / clear invalidates the recommendation (reference
+  // mismatch), so it also invalidates this selection — no stale window.
+  // Derived AFTER the hooks: `recommendation` is declared by the hook
+  // call above, so this must not run before it (TDZ).
+  const selectedCandidateIndex =
+    candidateSelection && candidateSelection.forRecommendation === recommendation
+      ? candidateSelection.index
+      : null;
+
+  const selectedCandidate =
+    recommendation && selectedCandidateIndex !== null
+      ? recommendation[selectedCandidateIndex]
+      : null;
+
+  function handleClearSearch() {
+    setPharmacies([]);
+    setSelectedPharmacy(null);
+    setHasSearched(false);
+    setCandidateSelection(null);
+    clearRecommendation();
+  }
+
+  function handleSelectCandidate(index) {
+    setSelectedPharmacy(null); // one info-window at a time
+    setCandidateSelection({ forRecommendation: recommendation, index });
+  }
+
+  function handleCloseCandidate() {
+    setCandidateSelection(null);
+  }
+
+  function handleClearRecommendation() {
+    setCandidateSelection(null);
+    clearRecommendation();
+  }
+
+  function handleLocationSelect(location) {
+    setSelectedLocation(location);
+  }
+
+  function handleCitySelect(city) {
+    setSelectedCity(city);
+  }
+
+  return (
+    <APIProvider apiKey={apiKey}>
+      <div className="map-app">
+        <AppHeader activePath={ROUTES.app} />
+
+        <SearchPanel
+          selectedCity={selectedCity}
+          onCitySelect={handleCitySelect}
+          searchRadius={searchRadius}
+          setSearchRadius={setSearchRadius}
+          setPharmacies={setPharmacies}
+          selectedLocation={selectedLocation}
+          setHasSearched={setHasSearched}
+        />
+
+        <div className="map-layout">
+          <div className="map-container">
+            <GoogleMap
+              mapId="DEMO_MAP_ID"
+              defaultCenter={DEFAULT_CITY.center}
+              defaultZoom={DEFAULT_CITY.zoom}
+              style={{ width: "100%", height: "600px" }}
+            >
+              <CityMapMover selectedCity={selectedCity} />
+              {selectedPharmacy && !selectedCandidate && (
+                <InfoWindow
+                  position={{
+                    lat: selectedPharmacy.lat,
+                    lng: selectedPharmacy.lng,
+                  }}
+                  onCloseClick={() => setSelectedPharmacy(null)}
+                >
+                  <div>
+                    <h3>{selectedPharmacy.name}</h3>
+                    <p>{selectedPharmacy.address}</p>
+                    <p>
+                      Direct distance:{" "}
+                      {formatDistance(selectedPharmacy.directDistanceMeters)}
+                    </p>
+                    <small>
+                      Measured in a straight line, not walking or driving
+                      distance.
+                    </small>
+                  </div>
+                </InfoWindow>
+              )}
+              <MapClickHandler onLocationSelect={handleLocationSelect} />
+              <OsmLayer features={geographicFeatures} />
+
+              {selectedLocation && (
+                <AdvancedMarker position={selectedLocation}>
+                  <div className="selected-location-marker">📍</div>
+                </AdvancedMarker>
+              )}
+              {selectedLocation && (
+                <Circle
+                  center={selectedLocation}
+                  radius={searchRadius}
+                  options={{
+                    fillColor: "#16a34a",
+                    fillOpacity: 0.15,
+                    strokeColor: "#16a34a",
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
+                  }}
+                />
+              )}
+              {pharmacies.map((pharmacy) => (
+                <AdvancedMarker
+                  key={pharmacy.id}
+                  position={{ lat: pharmacy.lat, lng: pharmacy.lng }}
+                  title={pharmacy.name}
+                  onClick={() => setSelectedPharmacy(pharmacy)}
+                />
+              ))}
+              {selectedCandidate && (
+                <InfoWindow
+                  position={{
+                    lat: selectedCandidate.lat,
+                    lng: selectedCandidate.lng,
+                  }}
+                  onCloseClick={handleCloseCandidate}
+                >
+                  <div className="candidate-window">
+                    <h3>
+                      {recommendation.indexOf(selectedCandidate) + 1}.{" "}
+                      Candidate spot
+                    </h3>
+                    <p>
+                      Walking distance to nearest competitor:{" "}
+                      {formatDistance(
+                        selectedCandidate.walkingSeparationMeters
+                      )}
+                    </p>
+                    <p>
+                      Nearest competitor:{" "}
+                      {selectedCandidate.nearestPharmacyName}
+                    </p>
+                    <small>
+                      {selectedCandidate.lat.toFixed(5)},{" "}
+                      {selectedCandidate.lng.toFixed(5)}
+                    </small>
+                  </div>
+                </InfoWindow>
+              )}
+              <CandidateMarkers
+                recommendation={recommendation}
+                selectedCandidateIndex={selectedCandidateIndex}
+                onSelectCandidate={handleSelectCandidate}
+              />
+            </GoogleMap>
+          </div>
+          <PharmacyList
+            pharmacies={pharmacies}
+            onSelectPharmacy={setSelectedPharmacy}
+            searchRadius={searchRadius}
+            hasSearched={hasSearched}
+            onClearSearch={handleClearSearch}
+          />
+          <CandidatesPanel
+            canRecommend={
+              hasSearched &&
+              pharmacies.length > 0 &&
+              !geographicError &&
+              !isGeographicLoading
+            }
+            recommendation={recommendation}
+            isLoading={isFinding}
+            error={findError}
+            selectedCandidateIndex={selectedCandidateIndex}
+            onFind={find}
+            onClear={handleClearRecommendation}
+            onSelectCandidate={handleSelectCandidate}
+          />
+          <GeographicAnalysis
+            stats={geographicStats}
+            isLoading={isGeographicLoading}
+            error={geographicError}
+            hasLocation={Boolean(selectedLocation)}
+          />
+        </div>
+      </div>
+    </APIProvider>
+  );
+}
+
+export default MapApp;
