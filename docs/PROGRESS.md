@@ -57,6 +57,12 @@ Step 11 on `feature/candidate-recommendation` (planned, approved, implemented):
   correct band with nearest competitor, walking separation, and
   straight-line distance; zero-result and unavailable-routing cases show the
   gray Unverified badge with a reason). Merged to main (`6acbd22`).
+- **Step 11:** browser check by the user: search → "Search for locations"
+  → up to 3 mutually distinct valid spots, none on roads, each ≥ 100 m
+  walking from every pharmacy. Clicking a candidate crashed the app on a
+  TDZ bug — `selectedCandidateIndex` was derived BEFORE the hook declared
+  `recommendation` (a latent bug from the clickable-spots commit); fixed in
+  `1c85b6f`, re-check click + InfoWindow before merging.
 
 ## Behavior changes so far (all agreed, documented in ARCHITECTURE.md §6/§8)
 
@@ -76,3 +82,8 @@ Step 11 on `feature/candidate-recommendation` (planned, approved, implemented):
 - Way coordinates resolve from the embedded `geometry` array; node
   references are only used for relation members (pinned by test).
 - The assembler's "no provider fields leak" test guards the domain boundary.
+- Deriving state that depends on a hook's return value in the same
+  function body but BEFORE the hook call throws a TDZ ReferenceError only
+  when the derivation reads it — it slips past lint, tests and
+  `npm run build`. Derived values must come after all hook calls
+  (`1c85b6f` was found by browser verification, not by any script).
