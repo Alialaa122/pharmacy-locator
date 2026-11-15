@@ -1,12 +1,5 @@
-import { useState, useEffect } from "react";
-import {
-  APIProvider,
-  Map as GoogleMap,
-  AdvancedMarker,
-  InfoWindow,
-  useMap,
-  Circle
-} from "@vis.gl/react-google-maps";
+import { useState } from "react";
+import { APIProvider, Map as GoogleMap } from "@vis.gl/react-google-maps";
 import AppHeader from "./AppHeader.jsx";
 import PharmacyList from "../PharmacyList.jsx";
 import GeographicAnalysis from "../GeographicAnalysis.jsx";
@@ -14,34 +7,18 @@ import SearchPanel from "./SearchPanel.jsx";
 import CandidatesPanel from "./CandidatesPanel.jsx";
 import OsmLayer from "./map/OsmLayer.jsx";
 import CityMapMover from "./map/CityMapMover.jsx";
+import MapClickHandler from "./map/MapClickHandler.jsx";
+import SearchCircle from "./map/SearchCircle.jsx";
+import LocationMarker from "./map/LocationMarker.jsx";
+import PharmacyMarkers from "./map/PharmacyMarkers.jsx";
+import PharmacyInfoWindow from "./map/PharmacyInfoWindow.jsx";
+import CandidateInfoWindow from "./map/CandidateInfoWindow.jsx";
 import CandidateMarkers from "./map/CandidateMarkers.jsx";
 import { useGeographicFeatures } from "../hooks/useGeographicFeatures.js";
 import { useCandidateRecommendation } from "../hooks/useCandidateRecommendation.js";
 import { CATEGORIES } from "../lib/categories.js";
 import { DEFAULT_CITY } from "../lib/cities.js";
-import { formatDistance } from "../lib/format.js";
 import { ROUTES } from "../router.jsx";
-
-function MapClickHandler({ onLocationSelect }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map) return;
-
-    const listener = map.addListener("click", (event) => {
-      const location = {
-        lat: event.latLng.lat(),
-        lng: event.latLng.lng(),
-      };
-
-      onLocationSelect(location);
-    });
-
-    return () => listener.remove();
-  }, [map, onLocationSelect]);
-
-  return null;
-}
 
 /**
  * The map application: owns the shared application state (pharmacies,
@@ -161,87 +138,41 @@ function MapApp({ apiKey }) {
               style={{ width: "100%", height: "600px" }}
             >
               <CityMapMover selectedCity={selectedCity} />
+
               {selectedPharmacy && !selectedCandidate && (
-                <InfoWindow
-                  position={{
-                    lat: selectedPharmacy.lat,
-                    lng: selectedPharmacy.lng,
-                  }}
-                  onCloseClick={() => setSelectedPharmacy(null)}
-                >
-                  <div>
-                    <h3>{selectedPharmacy.name}</h3>
-                    <p>{selectedPharmacy.address}</p>
-                    <p>
-                      Direct distance:{" "}
-                      {formatDistance(selectedPharmacy.directDistanceMeters)}
-                    </p>
-                    <small>
-                      Measured in a straight line, not walking or driving
-                      distance.
-                    </small>
-                  </div>
-                </InfoWindow>
+                <PharmacyInfoWindow
+                  pharmacy={selectedPharmacy}
+                  onClose={() => setSelectedPharmacy(null)}
+                />
               )}
+
               <MapClickHandler onLocationSelect={handleLocationSelect} />
               <OsmLayer features={geographicFeatures} />
 
               {selectedLocation && (
-                <AdvancedMarker position={selectedLocation}>
-                  <div className="selected-location-marker">📍</div>
-                </AdvancedMarker>
+                <LocationMarker position={selectedLocation} />
               )}
               {selectedLocation && (
-                <Circle
+                <SearchCircle
                   center={selectedLocation}
                   radius={searchRadius}
-                  options={{
-                    fillColor: "#16a34a",
-                    fillOpacity: 0.15,
-                    strokeColor: "#16a34a",
-                    strokeOpacity: 0.8,
-                    strokeWeight: 2,
-                  }}
                 />
               )}
-              {pharmacies.map((pharmacy) => (
-                <AdvancedMarker
-                  key={pharmacy.id}
-                  position={{ lat: pharmacy.lat, lng: pharmacy.lng }}
-                  title={pharmacy.name}
-                  onClick={() => setSelectedPharmacy(pharmacy)}
-                />
-              ))}
+
+              <PharmacyMarkers
+                pharmacies={pharmacies}
+                selectedPharmacyId={selectedPharmacy?.id ?? null}
+                onSelectPharmacy={setSelectedPharmacy}
+              />
+
               {selectedCandidate && (
-                <InfoWindow
-                  position={{
-                    lat: selectedCandidate.lat,
-                    lng: selectedCandidate.lng,
-                  }}
-                  onCloseClick={handleCloseCandidate}
-                >
-                  <div className="candidate-window">
-                    <h3>
-                      {recommendation.indexOf(selectedCandidate) + 1}.{" "}
-                      Candidate spot
-                    </h3>
-                    <p>
-                      Walking distance to nearest competitor:{" "}
-                      {formatDistance(
-                        selectedCandidate.walkingSeparationMeters
-                      )}
-                    </p>
-                    <p>
-                      Nearest competitor:{" "}
-                      {selectedCandidate.nearestPharmacyName}
-                    </p>
-                    <small>
-                      {selectedCandidate.lat.toFixed(5)},{" "}
-                      {selectedCandidate.lng.toFixed(5)}
-                    </small>
-                  </div>
-                </InfoWindow>
+                <CandidateInfoWindow
+                  candidate={selectedCandidate}
+                  rank={recommendation.indexOf(selectedCandidate) + 1}
+                  onClose={handleCloseCandidate}
+                />
               )}
+
               <CandidateMarkers
                 recommendation={recommendation}
                 selectedCandidateIndex={selectedCandidateIndex}
