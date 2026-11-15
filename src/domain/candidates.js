@@ -1,242 +1,274 @@
 /**
- * Deterministic candidate recommendation (step 11 — logic only).
+ * Geographic Candidate Finder — deterministic prototype logic.
  *
- * Proposes up to MAX_RECOMMENDATIONS spots where a new pharmacy would
- * COMPLY with the EDA 100 m rule measured against every existing
- * pharmacy. Pipeline:
+ * Finds up to MAX_RECOMMENDATIONS spots inside the user-selected radius
+ * where a new pharmacy would satisfy the two agreed constraints:
  *
- *   buildCandidateSites → prefilterCandidates → [Valhalla matrix —
- *   caller's job]        → rankCandidates
+ *   1. WALKING ≥ MIN_WALKING_DISTANCE_METERS from every existing
+ *      pharmacy (the authoritative rule — never substituted).
+ *   2. NOT on a road (off-road check against OSM road centerlines;
+ *      mere proximity is allowed).
  *
- * The rule is re-derived from `domain/eligibility.js` primitives
- * (`classifySeparation` for bands) against the FULL pharmacy list —
- * this module deliberately never reads the verdict state, which
- * certifies only the single clicked location.
+ * Pipeline (evaluated cheapest-first; the walking rule ALWAYS has the
+ * final say):
  *
- * Geometric fact the prefilter relies on: walking ≥ straight-line, so
- * a candidate ≥ MIN_SEPARATION_METERS straight-line from EVERY pharmacy
- * automatically passes the EDA rule on the walking measure.
+ *   generateCandidatePoints (pure) — deterministic grid inside the circle
+ *   filterOffRoad         (pure)   — road exclusion, secondary hard filter
+ *   filterFarEnough       (pure)   — straight-line REJECTION-ONLY
+ *                                   prefilter (walking ≥ straight-line
+ *                                   guarantees it can never wrongly
+ *                                   reject; it never ACCEPTS anyone)
+ *   [Valhalla matrix — caller's job, budget-capped]
+ *   applyWalkingGate      (pure)   — the real rule: EVERY candidate ↔
+ *                                    pharmacy pair must resolve as
+ *                                    walking ≥ 100 m; any missing route
+ *                                    ⇒ the candidate is INVALID.
+ *   selectDistinctCandidates (pure) — greedy mutual-spacing, top 3
  *
  * PURE module: no React, no network, no SDK. All inputs are plain data.
  */
 
 import {
   calculateDistance,
-  polygonCentroid,
-  lineMidpoint,
+  distanceToPolylineMeters,
+  METERS_PER_DEGREE,
 } from "../lib/geo.js";
-import { classifySeparation } from "./eligibility.js";
 
-/** Minimum straight-line separation (m) to every pharmacy — the EDA gate. */
-export const MIN_SEPARATION_METERS = 100;
+/** Walking-distance minimum to every pharmacy (the EDA rule, meters). */
+export const MIN_WALKING_DISTANCE_METERS = 100;
 
-/** Max number of candidates certified by a single routing call. */
-export const MAX_CERTIFY = 10;
+/** Candidates closer than a road centerline than this are on the road. */
+export const ROAD_EXCLUSION_METERS = 15;
 
-/** How many candidates the recommender returns. */
+/** Max candidates that may be certified by the routing matrix. */
+export const MAX_ROUTING_BUDGET = 20;
+
+/** How many candidates the finder returns. */
 export const MAX_RECOMMENDATIONS = 3;
 
-/** Sites closer than this are duplicates; a building wins the tie. */
-const DUPLICATE_DISTANCE_METERS = 10;
+/** Recommended candidates must be at least this far apart from each other. */
+export const MIN_DISTINCT_SPACING = 200;
 
 /**
- * Builds candidate sites from normalized OSM features:
- * building polygons → centroid, road lines → midpoint.
+ * Deterministic square grid inside the selected circle.
  *
- * @param {Array<object>} features - normalized features (see
- *   services/osmNormalize.js):
- *   { id, category, geometryType, name, coordinates }
- * @returns {Array<{ id: string, kind: "building"|"road",
- *   label: string, lat: number, lng: number }>}
- *   Sites closer than DUPLICATE_DISTANCE_METERS are deduplicated; a
- *   building beats a road on overlap.
- */
-export function buildCandidateSites(features) {
-  const rawSites = [];
-
-  for (const feature of features ?? []) {
-    let position = null;
-
-    if (
-      feature.category === "building" &&
-      feature.geometryType === "Polygon"
-    ) {
-      const ring = feature.coordinates?.[0];
-      position = polygonCentroid(ring);
-    } else if (
-      feature.category === "road" &&
-      feature.geometryType === "LineString"
-    ) {
-      position = lineMidpoint(feature.coordinates);
-    }
-
-    if (!position) {
-      continue;
-    }
-
-    rawSites.push({
-      id: feature.id,
-      kind: feature.category === "building" ? "building" : "road",
-      label: feature.name ?? (
-        feature.category === "building" ? "Building" : "Road"
-      ),
-      lat: position[1],
-      lng: position[0],
-    });
-  }
-
-  return deduplicateSites(rawSites);
-}
-
-function deduplicateSites(sites) {
-  const result = [];
-
-  for (const site of sites) {
-    const existing = result.find(
-      (candidate) =>
-        calculateDistance(candidate, site) < DUPLICATE_DISTANCE_METERS
-    );
-
-    if (!existing) {
-      result.push(site);
-    } else if (site.kind === "building" && existing.kind === "road") {
-      // A building footprint is a better "where to open" answer than
-      // the middle of a street, so it replaces the road site in place
-      // (keeps the site's position in the list stable).
-      Object.assign(existing, site);
-    }
-    // road overlapping a building, or same-kind overlap: first one
-    // wins — deterministic.
-  }
-
-  return result;
-}
-
-/**
- * Applies the EDA hard gate: a site survives only if its STRAIGHT-LINE
- * distance to EVERY pharmacy is ≥ MIN_SEPARATION_METERS. Survivors are
- * sorted by that margin DESCENDING (most separated first) and capped
- * at MAX_CERTIFY — the routing budget.
+ * Spaced so the count stays ~constant (≈50 points) regardless of
+ * radius: spacing = radius / 4. Points are generated in row-major
+ * order (north → south, west → east) with stable ids, so results and
+ * the map are deterministic.
  *
- * @param {Array<object>} sites - output of buildCandidateSites
- * @param {Array<{ lat: number, lng: number }>} pharmacies
- * @returns {Array<object>} gated sites, each annotated with
- *   `straightSeparationMeters` (min over all pharmacies); capped at
- *   MAX_CERTIFY
+ * @param {{ lat: number, lng: number }} center
+ * @param {number} radiusMeters
+ * @returns {Array<{ id: string, lat: number, lng: number }>}
  */
-export function prefilterCandidates(sites, pharmacies) {
-  if (!sites || !pharmacies || pharmacies.length === 0) {
+export function generateCandidatePoints(center, radiusMeters) {
+  if (!center || !(radiusMeters > 0)) {
     return [];
   }
 
-  const gated = [];
+  const spacingMeters = radiusMeters / 4;
+  const latStep = spacingMeters / METERS_PER_DEGREE;
+  const lngStep =
+    spacingMeters / (METERS_PER_DEGREE * Math.cos((center.lat * Math.PI) / 180));
 
-  for (const site of sites) {
-    const minMeters = pharmacies.reduce(
-      (min, pharmacy) => Math.min(min, calculateDistance(site, pharmacy)),
+  const rows = [-2, -1, 0, 1, 2];
+  const cols = [-2, -1, 0, 1, 2];
+
+  const points = [];
+
+  for (let r = 0; r < rows.length; r++) {
+    for (let c = 0; c < cols.length; c++) {
+      const lat = center.lat + rows[r] * latStep;
+      const lng = center.lng + cols[c] * lngStep;
+
+      if (calculateDistance({ lat, lng }, center) <= radiusMeters) {
+        points.push({ id: `grid-${rows[r]}-${cols[c]}`, lat, lng });
+      }
+    }
+  }
+
+  return points;
+}
+
+/**
+ * Rejects candidates that sit on a road: a candidate fails when any
+ * road's centerline is closer than ROAD_EXCLUSION_METERS. Being NEXT
+ * to a road is fine — only ON (within tolerance) a road rejects.
+ *
+ * @param {Array<{ id: string, lat: number, lng: number }>} points
+ * @param {Array<object>} roadFeatures - normalized OSM features (see
+ *   services/osmNormalize.js); only `category === "road"` LineStrings
+ *   are used, all others are ignored
+ * @returns {Array<object>} points that pass the check
+ */
+export function filterOffRoad(points, roadFeatures, roadExclusionMeters = ROAD_EXCLUSION_METERS) {
+  const roads = (
+    roadFeatures ?? []
+  ).filter(
+    (feature) => feature.category === "road" && feature.geometryType === "LineString"
+  );
+
+  if (roads.length === 0) {
+    return [...(points ?? [])];
+  }
+
+  return (points ?? []).filter((point) => {
+    for (const road of roads) {
+      const distance = distanceToPolylineMeters(point, road.coordinates);
+
+      if (distance !== null && distance < roadExclusionMeters) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+/**
+ * Straight-line prefilter against the pharmacy rule. A candidate is
+ * REJECTED when its straight-line distance to ANY pharmacy is below
+ * MIN_WALKING_DISTANCE_METERS.
+ *
+ * This is rejection-only: walking distance is always ≥ straight-line,
+ * so anything kept here can still be rejected (or accepted) by the
+ * walking gate — nothing kept here has passed the rule yet.
+ *
+ * @param {Array<{ id: string, lat: number, lng: number }>} points
+ * @param {Array<{ lat: number, lng: number }>} pharmacies
+ * @param {number} [minMeters]
+ * @returns {Array<object>} survivors, each annotated with
+ *   `straightSeparationMeters: number` for routing-budget ordering
+ */
+export function filterFarEnough(points, pharmacies, minMeters = MIN_WALKING_DISTANCE_METERS) {
+  if (!pharmacies || pharmacies.length === 0) {
+    return [];
+  }
+
+  const survivors = [];
+
+  for (const point of points ?? []) {
+    const minMetersToPoint = pharmacies.reduce(
+      (min, pharmacy) => Math.min(min, calculateDistance(point, pharmacy)),
       Infinity
     );
 
-    if (minMeters >= MIN_SEPARATION_METERS) {
-      gated.push({ ...site, straightSeparationMeters: minMeters });
+    if (minMetersToPoint >= minMeters) {
+      survivors.push({ ...point, straightSeparationMeters: minMetersToPoint });
     }
   }
 
-  return gated
-    .sort(
-      (a, b) => b.straightSeparationMeters - a.straightSeparationMeters
-    )
-    .slice(0, MAX_CERTIFY);
+  return survivors;
 }
 
 /**
- * Ranks prefiltered candidates with walking distances and certifies
- * the EDA band per candidate (reuses `classifySeparation`).
+ * Caps the survivors by straight-line margin (most separated first)
+ * down to MAX_ROUTING_BUDGET, so the Valhalla matrix stays within a
+ * request budget. The margin here is bookkeeping — no "better/worse"
+ * claim is made about the resulting candidates.
  *
- * Candidates without any walking route degrade gracefully: they keep
- * their straight-line separation, get `walkingVerified: false` and no
- * band, and are sorted after every walking-verified candidate.
- *
- * @param {Array<object>} candidates - output of prefilterCandidates
- * @param {Array<Array<{ distanceMeters: number, durationSeconds: number } | null>>}
- *   matrix - `matrix[s][t]` for candidate index s vs pharmacy index t
- *   (see services/routingService.getWalkingMatrix)
- * @param {Array<{ id: string, name?: string }>} pharmacies - same
- *   ordering as the matrix's second dimension
- * @returns {Array<object>} up to MAX_RECOMMENDATIONS candidates, each
- *   with `band` (eligibility band object or null), `separationMeters`,
- *   `separationBasis: "walking"|"straight"`, `nearestCompetition:
- *   { name: string } | null`, `walkingVerified: boolean`
+ * @param {Array<object>} survivors - output of filterFarEnough
+ * @param {number} [budget]
+ * @returns {Array<object>} at most `budget` survivors, margin-descending
  */
-export function rankCandidates(candidates, matrix, pharmacies) {
-  if (!candidates || candidates.length === 0) {
-    return [];
-  }
+export function budgetCandidates(survivors, budget = MAX_ROUTING_BUDGET) {
+  return (survivors ?? [])
+    .slice()
+    .sort((a, b) => b.straightSeparationMeters - a.straightSeparationMeters)
+    .slice(0, budget);
+}
 
-  const ranked = candidates.map((candidate, index) => {
+/**
+ * THE WALKING RULE. A candidate is valid only when its matrix row
+ * resolves a walking route to EVERY pharmacy AND that minimum walking
+ * distance is ≥ MIN_WALKING_DISTANCE_METERS.
+ *
+ * Agreed strictness: any missing route (null) makes the candidate
+ * invalid — an uncalculated distance is never assumed valid, whether
+ * from a single null cell or a fully failed matrix (a caller with no
+ * routing passes an empty/undefined matrix, and nothing survives).
+ *
+ * @param {Array<object>} candidates - output of budgetCandidates
+ * @param {Array<Array<{ distanceMeters: number, durationSeconds: number } | null>>}
+ *   matrix - `matrix[s][t]` index-matched to candidates and pharmacies
+ * @param {Array<{ id: string, name?: string, lat: number, lng: number }>}
+ *   pharmacies - same ordering as the matrix's second dimension
+ * @param {number} [minMeters]
+ * @returns {Array<object>} valid candidates, each with
+ *   `walkingSeparationMeters` and `nearestPharmacyName`
+ */
+export function applyWalkingGate(candidates, matrix, pharmacies, minMeters = MIN_WALKING_DISTANCE_METERS) {
+  const valid = [];
+
+  for (const [index, candidate] of (candidates ?? []).entries()) {
     const row = matrix?.[index] ?? [];
 
-    let nearestIndex = null;
     let nearestMeters = Infinity;
+    let nearestIndex = null;
+    let allResolved = (pharmacies ?? []).length > 0;
 
-    for (let t = 0; t < row.length; t++) {
+    for (let t = 0; t < (pharmacies ?? []).length; t++) {
       const route = row[t];
 
-      if (route && route.distanceMeters < nearestMeters) {
+      if (!route) {
+        allResolved = false;
+        break;
+      }
+
+      if (route.distanceMeters < nearestMeters) {
         nearestMeters = route.distanceMeters;
         nearestIndex = t;
       }
     }
 
-    const walkingVerified = nearestIndex !== null;
+    if (allResolved && nearestMeters >= minMeters) {
+      valid.push({
+        ...candidate,
+        walkingSeparationMeters: nearestMeters,
+        nearestPharmacyName:
+          pharmacies[nearestIndex]?.name ?? "Pharmacy",
+      });
+    }
+  }
 
-    return {
-      ...candidate,
-      walkingVerified,
-      separationMeters: walkingVerified
-        ? nearestMeters
-        : candidate.straightSeparationMeters,
-      separationBasis: walkingVerified ? "walking" : "straight",
-      band: walkingVerified
-        ? (classifySeparation(nearestMeters) ?? null)
-        : null,
-      nearestCompetition:
-        walkingVerified && pharmacies?.[nearestIndex]
-          ? { name: pharmacies[nearestIndex].name ?? "Pharmacy" }
-          : null,
-    };
-  });
-
-  return ranked
-    .sort((a, b) => {
-      // Walking-verified always outranks degraded; within each group
-      // the larger separation is the better spot.
-      if (a.walkingVerified !== b.walkingVerified) {
-        return a.walkingVerified ? -1 : 1;
-      }
-      return b.separationMeters - a.separationMeters;
-    })
-    .slice(0, MAX_RECOMMENDATIONS);
+  return valid;
 }
 
 /**
- * Orchestrates the full pipeline. The Valhalla matrix is a CALLER
- * dependency: the caller must have routed the prefiltered candidates
- * against the pharmacies (same ordering) before calling this — kept
- * out of the pure pipeline so the domain layer stays free of network
- * knowledge.
+ * Greedy mutual-spacing selection: scanning in input order, a valid
+ * candidate is picked only when it is at least MIN_DISTINCT_SPACING
+ * from every already-picked candidate. Stop at MAX_RECOMMENDATIONS.
  *
- * @param {Array<object>} features - normalized OSM features
- * @param {Array<{ lat, lng, id, name }> } pharmacies - search results
- * @param {Array<Array<{ distanceMeters, durationSeconds } | null>>} matrix
- *   Valhalla matrix over the PREFILTERED candidates (in the exact
- *   order `prefilterCandidates(features, pharmacies)` returns them)
- *   and the pharmacy list.
- * @returns {Array<object>} same shape as `rankCandidates` output
+ * The input order (grid scan order) breaks ties — the selection is
+ * fully deterministic. Returns fewer than 3 when fewer valid
+ * candidates exist; never pads.
+ *
+ * @param {Array<object>} valid - output of applyWalkingGate
+ * @param {number} [maxResults]
+ * @param {number} [minSpacingMeters]
+ * @returns {Array<object>} up to `maxResults` mutually distinct candidates
  */
-export function recommendLocations(features, pharmacies, matrix) {
-  const sites = buildCandidateSites(features);
-  const prefiltered = prefilterCandidates(sites, pharmacies);
+export function selectDistinctCandidates(
+  valid,
+  maxResults = MAX_RECOMMENDATIONS,
+  minSpacingMeters = MIN_DISTINCT_SPACING
+) {
+  const selected = [];
 
-  return rankCandidates(prefiltered, matrix, pharmacies);
+  for (const candidate of valid ?? []) {
+    if (selected.length >= maxResults) {
+      break;
+    }
+
+    const distinct = selected.every(
+      (picked) =>
+        calculateDistance(picked, candidate) >= minSpacingMeters
+    );
+
+    if (distinct) {
+      selected.push(candidate);
+    }
+  }
+
+  return selected;
 }

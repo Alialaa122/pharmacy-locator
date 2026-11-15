@@ -1,333 +1,364 @@
 import { describe, it, expect } from "vitest";
+import { calculateDistance as calculateDistanceMeters } from "../lib/geo.js";
 import {
-  MIN_SEPARATION_METERS,
-  MAX_CERTIFY,
+  MIN_WALKING_DISTANCE_METERS,
+  ROAD_EXCLUSION_METERS,
+  MAX_ROUTING_BUDGET,
   MAX_RECOMMENDATIONS,
-  buildCandidateSites,
-  prefilterCandidates,
-  rankCandidates,
-  recommendLocations,
+  MIN_DISTINCT_SPACING,
+  generateCandidatePoints,
+  filterOffRoad,
+  filterFarEnough,
+  budgetCandidates,
+  applyWalkingGate,
+  selectDistinctCandidates,
 } from "./candidates.js";
 
-// All test geography sits near Alexandria (31.2°N, 29.9°E).
-// At that latitude 1° latitude ≈ 111 195 m; 1° longitude ≈ 95 000 m.
-// 1e-5 degrees latitude ≈ 1.11 m.
-
+// Test geography near Alexandria (31.2°N). 1° latitude ≈ 111 194.93 m.
+const CENTER = { lat: 31.2001, lng: 29.9187 };
 const PHARMACY_A = { id: "p1", name: "Pharmacy A", lat: 31.2001, lng: 29.9187 };
 const PHARMACY_B = { id: "p2", name: "Pharmacy B", lat: 31.2001, lng: 29.9300 };
 
-// 1e-4° ≈ 11 m — a small ~11 m x 11 m building footprint.
-const buildingFeature = (id, lon, lat, name = null) => ({
+const point = (id, latOffsetMeters, lngOffsetMeters = 0, lng = CENTER.lng) => ({
   id,
-  category: "building",
-  geometryType: "Polygon",
-  name,
-  // Polygon features wrap the ring: coordinates = [ring]
-  coordinates: [
-    [
-      [lon, lat],
-      [lon, lat + 1e-4],
-      [lon + 1e-4, lat + 1e-4],
-      [lon + 1e-4, lat],
-      [lon, lat],
-    ],
-  ],
+  lat: CENTER.lat + latOffsetMeters / 111194.93,
+  lng: lng + lngOffsetMeters / (111194.93 * Math.cos((CENTER.lat * Math.PI) / 180)),
 });
 
-const roadFeature = (id, lon, lat, name = null) => ({
+const horizontalRoad = (id, lat, lngStart, lngEnd) => ({
   id,
   category: "road",
   geometryType: "LineString",
-  name,
+  name: null,
   coordinates: [
-    [lon, lat],
-    [lon + 5e-4, lat],
-    [lon + 1e-3, lat],
+    [lngStart, lat],
+    [lngEnd, lat],
   ],
 });
 
 describe("constants", () => {
   it("pins the agreed contract", () => {
-    expect(MIN_SEPARATION_METERS).toBe(100);
-    expect(MAX_CERTIFY).toBe(10);
+    expect(MIN_WALKING_DISTANCE_METERS).toBe(100);
+    expect(ROAD_EXCLUSION_METERS).toBe(15);
+    expect(MAX_ROUTING_BUDGET).toBe(20);
     expect(MAX_RECOMMENDATIONS).toBe(3);
+    expect(MIN_DISTINCT_SPACING).toBe(200);
   });
 });
 
-describe("buildCandidateSites", () => {
-  it("builds a building site from a polygon centroid", () => {
-    const sites = buildCandidateSites([
-      buildingFeature("way/1", 29.9187, 31.2001, "Al-Noor Block"),
-    ]);
+describe("generateCandidatePoints", () => {
+  it("produces a deterministic 5x5 grid (25 points, radius-independent count)", () => {
+    const points = generateCandidatePoints(CENTER, 1000);
 
-    expect(sites).toHaveLength(1);
-    expect(sites[0].id).toBe("way/1");
-    expect(sites[0].kind).toBe("building");
-    expect(sites[0].label).toBe("Al-Noor Block");
-    // Rectangular footprint: the centroid is its geometric center
-    expect(sites[0].lng).toBeCloseTo(29.91875, 8);
-    expect(sites[0].lat).toBeCloseTo(31.20015, 8);
+    expect(points).toHaveLength(25);
+    expect(points[0].id).toBe("grid--2--2");
+
+    // Spacing = radius / 4 = 250 m between adjacent points
+    const row22 = points.find((p) => p.id === "grid--2--2");
+    const row21 = points.find((p) => p.id === "grid--2--1");
+    expect(
+      calculateDistanceMeters(row21, row22)
+    ).toBeCloseTo(250, 0);
   });
 
-  it("builds a road site from a line midpoint", () => {
-    const sites = buildCandidateSites([
-      roadFeature("way/2", 29.9187, 31.2050, "Corniche Road"),
-    ]);
+  it("keeps every point inside (or on) the selected radius", () => {
+    for (const radius of [200, 1000, 3000]) {
+      const points = generateCandidatePoints(CENTER, radius);
 
-    expect(sites).toHaveLength(1);
-    expect(sites[0].kind).toBe("road");
-    expect(sites[0].label).toBe("Corniche Road");
-    // Middle vertex of 3-point line = index 1
-    expect(sites[0].lng).toBeCloseTo(29.9192, 6);
-    expect(sites[0].lat).toBeCloseTo(31.205, 6);
+      for (const p of points) {
+        expect(calculateDistanceMeters(p, CENTER)).toBeLessThanOrEqual(radius + 1);
+      }
+
+      // Same count for every radius — the count is radius-independent
+      expect(points).toHaveLength(25);
+    }
   });
 
-  it("falls back to generic labels when OSM name is missing", () => {
-    const sites = buildCandidateSites([
-      buildingFeature("way/3", 29.92, 31.205),
-      roadFeature("way/4", 29.92, 31.206),
-    ]);
-
-    expect(sites.map((site) => site.label)).toEqual([
-      "Building",
-      "Road",
-    ]);
+  it("is deterministic: same input, same output (stable ids and order)", () => {
+    expect(generateCandidatePoints(CENTER, 1000))
+      .toEqual(generateCandidatePoints(CENTER, 1000));
   });
 
-  it("ignores features it cannot place (other categories, degenerate geometry)", () => {
-    const sites = buildCandidateSites([
-      // school node — not a candidate source
-      { id: "node/1", category: "school", geometryType: "Point", name: "S", coordinates: [29.9, 31.2] },
-      // degenerate building polygon (zero area)
-      {
-        id: "way/5",
-        category: "building",
-        geometryType: "Polygon",
-        name: null,
-        coordinates: [[[29.9, 31.2], [29.9001, 31.2001], [29.9002, 31.2002], [29.9, 31.2]]],
-      },
-      // road with a single point
-      { id: "way/6", category: "road", geometryType: "LineString", name: null, coordinates: [[29.9, 31.2]] },
-    ]);
+  it("scales spacing with the radius (spacing = radius / 4)", () => {
+    const small = generateCandidatePoints(CENTER, 400); // spacing 100 m
+    const big = generateCandidatePoints(CENTER, 1600);   // spacing 400 m
 
-    expect(sites).toEqual([]);
+    const smallCenter = small.find((p) => p.id === "grid-0-1");
+    const smallWest = small.find((p) => p.id === "grid-0-0");
+    const bigCenter = big.find((p) => p.id === "grid-0-1");
+    const bigWest = big.find((p) => p.id === "grid-0-0");
+
+    expect(calculateDistanceMeters(smallCenter, smallWest)).toBeCloseTo(100, 0);
+    expect(calculateDistanceMeters(bigCenter, bigWest)).toBeCloseTo(400, 0);
   });
 
-  it("handles null/undefined feature lists", () => {
-    expect(buildCandidateSites(null)).toEqual([]);
-    expect(buildCandidateSites(undefined)).toEqual([]);
-  });
-
-  it("deduplicates overlapping sites, with the building winning", () => {
-    // Road midpoint is at [29.9305, 31.2100]; the building centroid is
-    // placed ~7 m from it — within the 10 m dedupe radius.
-    const sites = buildCandidateSites([
-      roadFeature("way/7", 29.9300, 31.2100),
-      buildingFeature("way/8", 29.9305005, 31.2100005, "Tall Building"),
-    ]);
-
-    expect(sites).toHaveLength(1);
-    expect(sites[0].id).toBe("way/8");
-    expect(sites[0].kind).toBe("building");
-    expect(sites[0].label).toBe("Tall Building");
+  it("returns nothing for invalid input", () => {
+    expect(generateCandidatePoints(null, 1000)).toEqual([]);
+    expect(generateCandidatePoints(CENTER, 0)).toEqual([]);
+    expect(generateCandidatePoints(CENTER, -50)).toEqual([]);
   });
 });
 
-describe("prefilterCandidates", () => {
-  const site = (id, lat, lng) => ({ id, kind: "building", label: id, lat, lng });
+describe("filterOffRoad", () => {
+  const road = horizontalRoad("way/1", CENTER.lat, 29.9, 29.93);
 
-  it("keeps a site only at least 100 m straight-line from EVERY pharmacy (boundary inclusive)", () => {
-    // 1e-5° latitude ≈ 1.11 m; 1° longitude at 31.2°N ≈ 95 280 m
-    const justInside = site(
-      "s99",
-      31.2001,
-      29.9187 - 99 / 95280 // 99 m west of A
-    );
-    const justOutside = site(
-      "s101",
-      31.2001,
-      29.9187 - 101 / 95280 // 101 m west of A
-    );
+  it("rejects a candidate ON a road centerline", () => {
+    const onRoad = point("on", 0); // lat = CENTER.lat = the road's latitude
+    const offRoad = point("off", 30); // 30 m north of the road
 
-    const survivors = prefilterCandidates([justInside, justOutside], [PHARMACY_A]);
+    expect(filterOffRoad([onRoad, offRoad], [road])
+      .map((p) => p.id)).toEqual(["off"]);
+  });
 
-    expect(survivors.map((s) => s.id)).toEqual(["s101"]);
+  it("rejects near the road (within 15 m) but allows proximity beyond it", () => {
+    const justInside = point("i", 14);
+    const justOutside = point("o", 16);
+
+    // Boundary is exclusive: exactly < 15 rejects, ≥ 15 keeps
+    expect(filterOffRoad([justInside], [road])).toHaveLength(0);
+    expect(filterOffRoad([justOutside], [road])).toHaveLength(1);
+  });
+
+  it("keeps everything when no road features exist", () => {
+    const near = point("a", 5); // 5 m north of the road...
+
+    expect(filterOffRoad([near], [])).toHaveLength(1);
+    expect(filterOffRoad([near], undefined)).toHaveLength(1);
+  });
+
+  it("only treats category 'road' LineStrings as roads (buildings ignored)", () => {
+    const onRoad = point("on", 0);
+    const building = {
+      id: "way/9",
+      category: "building",
+      geometryType: "Polygon",
+      name: null,
+      coordinates: [[[29.9, CENTER.lat], [29.93, CENTER.lat], [29.9, CENTER.lat]]],
+    };
+
+    expect(filterOffRoad([onRoad], [building])).toHaveLength(1);
+  });
+
+  it("rejects when ANY road is close (not just the closest feature)", () => {
+    const road2 = horizontalRoad("way/2", CENTER.lat + 40 / 111194.93, 29.9, 29.93);
+    const nearRoad2Only = point("r", 40); // 40 m north = on road2, 40 m from road1
+
+    expect(filterOffRoad([nearRoad2Only], [road, road2])).toHaveLength(0);
+  });
+});
+
+describe("filterFarEnough", () => {
+  it("rejects a point straight-line < 100 m from ANY pharmacy (boundary inclusive)", () => {
+    const justInside = point("in", 0, -99);   // 99 m west of A
+    const justOutside = point("out", 0, -101); // 101 m west of A
+
+    const survivors = filterFarEnough([justInside, justOutside], [PHARMACY_A]);
+
+    expect(survivors.map((p) => p.id)).toEqual(["out"]);
     expect(survivors[0].straightSeparationMeters).toBeCloseTo(101, 0);
   });
 
-  it("rejects a site inside 100 m of ANY pharmacy, even if far from the others", () => {
-    const tooClose = site("s3", 31.2001 + 55 / 111195, 29.9187); // ~55 m north of A
-    const farEnough = site("s2", 31.2001 + 150 / 111195, 29.9187); // ~150 m north of A
-    const results = prefilterCandidates(
-      [tooClose, farEnough],
-      [PHARMACY_A, PHARMACY_B]
-    );
+  it("rejects based on the NEAREST pharmacy, even if far from the others", () => {
+    const tooClose = point("c", 55, 0); // 55 m north of A, ~1.2 km from B
 
-    expect(results.map((s) => s.id)).toEqual(["s2"]);
+    expect(filterFarEnough([tooClose], [PHARMACY_A, PHARMACY_B])).toEqual([]);
   });
 
-  it("sorts survivors by margin descending and caps at MAX_CERTIFY", () => {
-    const far = site("far", 31.2050, 29.9250);   // ≈ 550 m from both
-    const near = site("near", 31.2001 + 150 / 111195, 29.9187); // ≈ 150 m from A
+  it("annotates survivors with the minimum straight-line separation", () => {
+    const result = filterFarEnough([point("x", 0, -300)], [PHARMACY_A, PHARMACY_B]);
 
-    const results = prefilterCandidates([near, far], [PHARMACY_A, PHARMACY_B]);
-
-    expect(results[0].id).toBe("far");
-    expect(results[1].id).toBe("near");
+    expect(result[0].straightSeparationMeters).toBeCloseTo(300, 0);
   });
 
-  it("caps the list at MAX_CERTIFY", () => {
-    // 12 well-separated sites — only the 10 largest margins survive
-    const sites = Array.from({ length: 12 }, (_, i) => ({
-      id: `s${i}`,
-      kind: "building",
-      label: `S${i}`,
-      lat: 31.22 + i * (50 / 111195), // stack north, each 50 m apart
-      lng: 29.95,
-    }));
-
-    const results = prefilterCandidates(sites, [PHARMACY_A]);
-
-    expect(results).toHaveLength(MAX_CERTIFY);
-    // The farthest site must be in (it has the best margin)
-    expect(results.map((s) => s.id)).toContain("s11");
-    // The nearest to the pharmacy must be cut (worst margin)
-    expect(results.map((s) => s.id)).not.toContain("s0");
-  });
-
-  it("returns nothing when there are no pharmacies (the gate is vacuous)", () => {
-    expect(prefilterCandidates([site("s", 31.2, 29.9)], [])).toEqual([]);
-    expect(prefilterCandidates([site("s", 31.2, 29.9)], null)).toEqual([]);
-    expect(prefilterCandidates(null, [PHARMACY_A])).toEqual([]);
+  it("returns nothing when there are no pharmacies (nothing to measure against)", () => {
+    expect(filterFarEnough([point("s", 0, 0)], [])).toEqual([]);
+    expect(filterFarEnough([point("s", 0, 0)], null)).toEqual([]);
   });
 });
 
-describe("rankCandidates", () => {
-  const candidate = (id, straight) => ({
+describe("budgetCandidates", () => {
+  it("sorts by straight-line margin descending and caps at the budget", () => {
+    const near = { id: "near", lat: 0, lng: 0, straightSeparationMeters: 120 };
+    const far = { id: "far", lat: 1, lng: 1, straightSeparationMeters: 900 };
+
+    const result = budgetCandidates([near, far]);
+
+    expect(result.map((c) => c.id)).toEqual(["far", "near"]);
+  });
+
+  it("caps larger lists at MAX_ROUTING_BUDGET, keeping the largest margins", () => {
+    const many = Array.from({ length: 25 }, (_, i) => ({
+      id: `c${i}`,
+      lat: i,
+      lng: 0,
+      straightSeparationMeters: 100 + i * 10,
+    }));
+
+    const result = budgetCandidates(many);
+
+    expect(result).toHaveLength(MAX_ROUTING_BUDGET);
+    expect(result).toContainEqual(expect.objectContaining({ id: "c24" }));
+    expect(result.find((c) => c.id === "c0")).toBeUndefined();
+  });
+});
+
+describe("applyWalkingGate", () => {
+  const candidate = (id, straight = 300) => ({
     id,
-    kind: "building",
-    label: id,
-    lat: 31.2,
-    lng: 29.9,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
     straightSeparationMeters: straight,
   });
 
-  it("certifies the EDA band from the NEAREST walking distance", () => {
-    const candidates = [candidate("c1", 300)];
+  it("validates from the NEAREST walking distance and records the nearest pharmacy", () => {
     const matrix = [[
-      { distanceMeters: 180, durationSeconds: 144 },
-      { distanceMeters: 400, durationSeconds: 320 },
+      { distanceMeters: 180, durationSeconds: 144 }, // A
+      { distanceMeters: 400, durationSeconds: 320 }, // B
     ]];
 
-    const ranked = rankCandidates(candidates, matrix, [PHARMACY_A, PHARMACY_B]);
+    const valid = applyWalkingGate([candidate("c1")], matrix, [PHARMACY_A, PHARMACY_B]);
 
-    expect(ranked).toHaveLength(1);
-    expect(ranked[0].band.id).toBe("strong"); // 180 m walking
-    expect(ranked[0].separationMeters).toBe(180);
-    expect(ranked[0].separationBasis).toBe("walking");
-    expect(ranked[0].nearestCompetition).toEqual({ name: "Pharmacy A" });
-    expect(ranked[0].walkingVerified).toBe(true);
+    expect(valid).toHaveLength(1);
+    expect(valid[0].walkingSeparationMeters).toBe(180);
+    expect(valid[0].nearestPharmacyName).toBe("Pharmacy A");
   });
 
-  it("ranks walking-verified candidates ahead of degraded ones, by separation", () => {
-    const candidates = [
-      candidate("certified-small", 200),
-      candidate("unverified-huge", 5000),
-      candidate("certified-big", 400),
-    ];
+  it("the WALKING rule beats straight-line: 300 m straight but 90 m walking is INVALID", () => {
     const matrix = [
-      [{ distanceMeters: 120, durationSeconds: 96 }, null],                // certified @120
-      [null, null],                                                        // fully degraded
-      [{ distanceMeters: 300, durationSeconds: 240 }, null],               // certified @300
+      [{ distanceMeters: 90, durationSeconds: 72 }],
     ];
 
-    const ranked = rankCandidates(candidates, matrix, [PHARMACY_A]);
-
-    expect(ranked.map((c) => c.id)).toEqual([
-      "certified-big",
-      "certified-small",
-      "unverified-huge",
-    ]);
-    expect(ranked[2].walkingVerified).toBe(false);
-    expect(ranked[2].separationMeters).toBe(5000); // keeps straight-line
-    expect(ranked[2].separationBasis).toBe("straight");
-    expect(ranked[2].band).toBeNull();
-    expect(ranked[2].nearestCompetition).toBeNull();
+    // Straight-line says compliant (300 m); walking is the measure — reject
+    expect(
+      applyWalkingGate([candidate("c", 300)], matrix, [PHARMACY_A])
+    ).toEqual([]);
   });
 
-  it("returns the top 3 when more candidates exist", () => {
-    const candidates = [200, 500, 900, 1200].map(
-      (meters, i) => candidate(`c${i}`, meters)
-    );
-    const matrix = candidates.map((c) => [
-      [{ distanceMeters: c.straightSeparationMeters, durationSeconds: 1 }, null],
-    ]);
+  it("boundary: exactly 100 m walking is valid", () => {
+    const matrix = [
+      [{ distanceMeters: 100, durationSeconds: 80 }],
+    ];
 
-    const ranked = rankCandidates(candidates, matrix, [PHARMACY_A]);
-
-    expect(ranked).toHaveLength(MAX_RECOMMENDATIONS);
-    expect(ranked.map((c) => c.id)).toEqual(["c3", "c2", "c1"]);
+    expect(
+      applyWalkingGate([candidate("c")], matrix, [PHARMACY_A])
+    ).toHaveLength(1);
   });
 
-  it("handles empty or missing inputs without throwing", () => {
-    expect(rankCandidates([], [[{ distanceMeters: 100, durationSeconds: 1 }]], [PHARMACY_A])).toEqual([]);
-    expect(rankCandidates(null, null, null)).toEqual([]);
-    expect(rankCandidates([candidate("c", 100)], undefined, [PHARMACY_A])).toHaveLength(1);
-    expect(rankCandidates([candidate("c", 100)], undefined, [PHARMACY_A])[0].walkingVerified).toBe(false);
+  it("ANY missing route makes the candidate invalid (strict — never assumed valid)", () => {
+    const oneNull = [[{ distanceMeters: 300, durationSeconds: 1 }, null]];
+    const allNull = [[null, null]];
+
+    expect(
+      applyWalkingGate([candidate("a"), candidate("b")], [oneNull, allNull], [PHARMACY_A, PHARMACY_B])
+    ).toEqual([]);
+  });
+
+  it("an empty or missing matrix (routing completely failed) validates nothing", () => {
+    expect(
+      applyWalkingGate([candidate("a")], [], [PHARMACY_A, PHARMACY_B])
+    ).toEqual([]);
+    expect(
+      applyWalkingGate([candidate("a")], undefined, [PHARMACY_A])
+    ).toEqual([]);
   });
 });
 
-describe("recommendLocations (pipeline)", () => {
-  it("flows sites → prefilter → rank end to end", () => {
-    // Two buildings, both far from the single pharmacy; one road nearby
-    const features = [
-      buildingFeature("way/1", 29.9187, 31.2100, "North Block"),   // ~1.10 km from A
-      buildingFeature("way/2", 29.9350, 31.2001, "East Block"),    // ~1.56 km from A
-      roadFeature("way/3", 29.9190, 31.2002),                       // ~35 m from A → gated
-    ];
-    const pharmacies = [PHARMACY_A];
-    // Row order must match the prefilter's margin-descending order:
-    // way/2 (≈1.56 km straight) comes before way/1 (≈1.10 km).
-    const matrix = [
-      [{ distanceMeters: 1650, durationSeconds: 1320 }], // way/2 walking
-      [{ distanceMeters: 950, durationSeconds: 760 }],   // way/1 walking
-    ];
+describe("selectDistinctCandidates", () => {
+  it("enforces mutual spacing in input order and stops at 3", () => {
+    const a = point("a", 0, 0);            // 0 m
+    const b = point("b", 150, 0);           // 150 m north of a — too close
+    const c = point("c", 400, 0);           // 400 m north of a — ok
+    const d = point("d", 650, 0);           // 250 m from c — ok
 
-    const recommendations = recommendLocations(features, pharmacies, matrix);
-    const prefiltered = prefilterCandidates(
-      buildCandidateSites(features),
-      pharmacies
+    const selected = selectDistinctCandidates([a, b, c, d]);
+
+    // Scan order: a, skip b (150 m from a), c, d (250 m from c),
+    // stop at 3
+    expect(selected.map((p) => p.id)).toEqual(["a", "c", "d"]);
+  });
+
+  it("returns fewer when fewer candidates clear the spacing", () => {
+    const a = point("a", 0, 0);
+    const b = point("b", 100, 0);
+
+    expect(selectDistinctCandidates([a, b])).toHaveLength(1);
+    expect(selectDistinctCandidates([a, b])[0].id).toBe("a");
+  });
+
+  it("handles empty input", () => {
+    expect(selectDistinctCandidates([])).toEqual([]);
+    expect(selectDistinctCandidates(null)).toEqual([]);
+  });
+});
+
+describe("full pipeline (composition)", () => {
+  function runPipeline(center, radius, roads, pharmacies, matrix) {
+    const points = generateCandidatePoints(center, radius);
+    const offRoad = filterOffRoad(points, roads);
+    const farEnough = filterFarEnough(offRoad, pharmacies);
+    const budgeted = budgetCandidates(farEnough);
+    const valid = applyWalkingGate(budgeted, matrix, pharmacies);
+
+    return {
+      stages: { points, offRoad, farEnough, budgeted, valid },
+      result: selectDistinctCandidates(valid),
+    };
+  }
+
+  it("finds up to 3 mutually distinct valid candidates end to end", () => {
+    const radius = 300;
+    const road = horizontalRoad("way/1", CENTER.lat, 29.9, 29.93); // cuts the middle row
+
+    // The middle row (grid-0-*) sits on the road — those 5 are excluded,
+    // the other 20 (all ≥ 100 m straight-line from the centered pharmacy)
+    // survive into the routing budget.
+    const matrix = Array.from({ length: 20 }, () => [
+      { distanceMeters: 260, durationSeconds: 208 },
+    ]);
+
+    const { result } = runPipeline(CENTER, radius, [road], [PHARMACY_A], matrix);
+
+    expect(result.length).toBeLessThanOrEqual(MAX_RECOMMENDATIONS);
+    // With a 75 m grid and 200 m mutual spacing, at least one must survive
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    for (const candidate of result) {
+      expect(candidate.walkingSeparationMeters).toBe(260);
+      expect(candidate.nearestPharmacyName).toBe("Pharmacy A");
+    }
+    // Mutual spacing is enforced in the output
+    for (let i = 0; i < result.length; i++) {
+      for (let j = i + 1; j < result.length; j++) {
+        expect(calculateDistanceMeters(result[i], result[j]))
+          .toBeGreaterThanOrEqual(MIN_DISTINCT_SPACING);
+      }
+    }
+  });
+
+  it("is deterministic end to end", () => {
+    const road = horizontalRoad("way/1", CENTER.lat, 29.9, 29.93);
+    const run = () => {
+      const budgeted = budgetCandidates(filterFarEnough(
+        filterOffRoad(generateCandidatePoints(CENTER, 300), [road]),
+        [PHARMACY_A]
+      ));
+
+      return selectDistinctCandidates(
+        applyWalkingGate(
+          budgeted,
+          budgeted.map(() => [{ distanceMeters: 300, durationSeconds: 240 }]),
+          [PHARMACY_A]
+        )
+      );
+    };
+
+    expect(run()).toEqual(run());
+  });
+
+  it("produces nothing when routing fails (no valid walking proof)", () => {
+    const { result } = runPipeline(
+      CENTER, 300, [], [PHARMACY_A], [] // empty matrix
     );
 
-    expect(prefiltered.map((s) => s.id)).toEqual(["way/2", "way/1"]);
-    expect(recommendations).toHaveLength(2);
-    expect(recommendations[0].id).toBe("way/2"); // 1650 m walking > 950 m
-    expect(recommendations[0].label).toBe("East Block");
-    expect(recommendations[0].band.id).toBe("very-strong");
-    expect(recommendations[0].nearestCompetition).toEqual({ name: "Pharmacy A" });
-  });
-
-  it("recommends nothing when no site clears the hard gate", () => {
-    const features = [
-      buildingFeature("way/9", 29.91871, 31.20011), // ~11 m from pharmacy
-    ];
-
-    expect(recommendLocations(features, [PHARMACY_A], [
-      [{ distanceMeters: 120, durationSeconds: 96 }],
-    ])).toEqual([]);
-  });
-
-  it("recommends nothing when no pharmacies were found", () => {
-    const features = [buildingFeature("way/1", 29.9187, 31.2100)];
-
-    expect(recommendLocations(features, [], [])).toEqual([]);
-  });
-
-  it("recommends nothing when there is no building or road data", () => {
-    const features = [
-      { id: "node/1", category: "school", geometryType: "Point", name: "S", coordinates: [29.9, 31.2] },
-    ];
-
-    expect(recommendLocations(features, [PHARMACY_A], [])).toEqual([]);
+    expect(result).toEqual([]);
   });
 });

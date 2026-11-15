@@ -47,101 +47,8 @@ export function convertCoordinates(coordinates) {
   }));
 }
 
-/**
- * Area-weighted centroid of a closed [lon, lat] ring, returned as
- * [lon, lat]. Planar approximation — accurate enough for building
- * footprints at city scale.
- *
- * @param {Array<[number, number]>} ring - closed polygon ring
- *   (the last point repeats the first, as in the OSM normalizer output)
- * @returns {[number, number] | null} [longitude, latitude], or null for
- *   degenerate rings (fewer than 3 points / zero area)
- */
-export function polygonCentroid(ring) {
-  if (!ring || ring.length < 3) {
-    return null;
-  }
-
-  // Drop the closing duplicate — polygon area math needs an open
-  // vertex sequence with the wrap-around edge applied.
-  const points =
-    ring[0][0] === ring[ring.length - 1][0] &&
-    ring[0][1] === ring[ring.length - 1][1]
-      ? ring.slice(0, -1)
-      : ring;
-
-  if (points.length < 3) {
-    return null;
-  }
-
-  // Translate the ring so it sits near the origin before the shoelace
-  // math: building coordinates (~30° in absolute degrees) would
-  // otherwise cancel catastrophically against areas of ~1e-6.
-  const [originLon, originLat] = points[0];
-  const shifted = points.map(
-    ([lon, lat]) => [lon - originLon, lat - originLat]
-  );
-
-  let area = 0;
-  let centroidLon = 0;
-  let centroidLat = 0;
-
-  for (let i = 0; i < shifted.length; i++) {
-    const [x0, y0] = shifted[i];
-    const [x1, y1] = shifted[(i + 1) % shifted.length];
-
-    const cross = x0 * y1 - x1 * y0;
-
-    area += cross;
-    centroidLon += (x0 + x1) * cross;
-    centroidLat += (y0 + y1) * cross;
-  }
-
-  area /= 2;
-
-  // Zero-area ring (collinear points) — not a real building footprint.
-  if (Math.abs(area) < 1e-12) {
-    return null;
-  }
-
-  return [
-    centroidLon / (6 * area) + originLon,
-    centroidLat / (6 * area) + originLat,
-  ];
-}
-
-/**
- * Midpoint of a [lon, lat] polyline, returned as [lon, lat].
- *
- * For an open line (a road) it returns the middle vertex; for a closed
- * ring it returns the ring's first vertex (a deterministic "anchor"
- * point — the recommender only needs one representative spot per line).
- *
- * @param {Array<[number, number]>} coordinates - [lon, lat] sequence
- * @returns {[number, number] | null} [longitude, latitude], or null
- *   when the line has fewer than 2 points
- */
-export function lineMidpoint(coordinates) {
-  if (!coordinates || coordinates.length < 2) {
-    return null;
-  }
-
-  const first = coordinates[0];
-  const last = coordinates[coordinates.length - 1];
-
-  const isClosed = first[0] === last[0] && first[1] === last[1];
-
-  if (isClosed) {
-    return first;
-  }
-
-  const midIndex = Math.floor((coordinates.length - 1) / 2);
-
-  return coordinates[midIndex];
-}
-
 /** Earth circumference per degree, in meters (2πR/360, R = 6 371 000). */
-const METERS_PER_DEGREE = (2 * Math.PI * 6371000) / 360;
+export const METERS_PER_DEGREE = (2 * Math.PI * 6371000) / 360;
 
 /**
  * Shortest distance from a point to a [lon, lat] polyline, in METERS.
@@ -149,8 +56,7 @@ const METERS_PER_DEGREE = (2 * Math.PI * 6371000) / 360;
  * Planar approximation: all coordinates are projected onto a flat
  * local plane anchored at the polyline's first vertex, with longitude
  * scaled by cos(origin latitude) so degrees become comparable in
- * both axes. Accurate at city scale (tens of km at most) — the same
- * rationale as polygonCentroid's planar math.
+ * both axes. Accurate at city scale (tens of km at most).
  *
  * @param {{ lat: number, lng: number }} point
  * @param {Array<[number, number]>} coordinates - [lon, lat] sequence
