@@ -1,11 +1,12 @@
 import { useState, useRef } from "react";
 import {
   generateCandidatePoints,
-  filterOffRoad,
-  filterFarEnough,
+  partitionOffRoad,
+  partitionFarEnough,
   budgetCandidates,
-  applyWalkingGate,
+  partitionWalkingGate,
   selectDistinctCandidates,
+  summarizeRun,
 } from "../domain/candidates.js";
 import { getWalkingMatrix } from "../services/routingService.js";
 
@@ -37,6 +38,8 @@ import { getWalkingMatrix } from "../services/routingService.js";
  * @returns {{
  *   recommendation: Array | null,   // null = not computed / invalidated;
  *                                    // [] = ran, none valid
+ *   summary: object | null,         // counts of the last run
+ *   rejected: Array | null,         // the rejected candidates + reasons
  *   isLoading: boolean,
  *   error: string,
  *   find: () => void,
@@ -49,18 +52,27 @@ export function useCandidateRecommendation(
   features,
   pharmacies
 ) {
-  // { forPharmacies, candidates } — the stored answer is only "live"
-  // while forPharmacies IS the current pharmacy array.
+  // { forPharmacies, candidates, summary, rejected } — the stored
+  // answer is only "live" while forPharmacies IS the current pharmacy
+  // array.
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const requestIdRef = useRef(0);
 
-  const recommendation =
-    result && result.forPharmacies === pharmacies ? result.candidates : null;
+  const isCurrent = result && result.forPharmacies === pharmacies;
 
-  function storeResult(candidates, targetPharmacies = pharmacies) {
-    setResult({ forPharmacies: targetPharmacies, candidates });
+  const recommendation = isCurrent ? result.candidates : null;
+  const summary = isCurrent ? result.summary : null;
+  const rejected = isCurrent ? result.rejected : null;
+
+  function storeResult(candidates, run, targetPharmacies = pharmacies) {
+    setResult({
+      forPharmacies: targetPharmacies,
+      candidates,
+      summary: run?.summary ?? null,
+      rejected: run?.rejected ?? null,
+    });
     setIsLoading(false);
   }
 
@@ -72,15 +84,32 @@ export function useCandidateRecommendation(
 
     try {
       const points = generateCandidatePoints(selectedLocation, searchRadius);
-      const offRoad = filterOffRoad(points, features);
-      const survivable = filterFarEnough(offRoad, pharmacies);
+      const { kept: offRoad, rejected: roadRejections } = partitionOffRoad(
+        points,
+        features
+      );
+      const { kept: survivable, rejected: distanceRejections } =
+        partitionFarEnough(offRoad, pharmacies);
       const budgeted = budgetCandidates(survivable);
+      const notEvaluated = survivable.length - budgeted.length;
+
+      const rejectedSoFar = [...roadRejections, ...distanceRejections];
 
       // Zero survivable candidates — the straight-line rule and the
       // road check already rejected everything. No routing needed;
       // walking could only reject more (walking ≥ straight-line).
       if (budgeted.length === 0) {
-        storeResult([]);
+        storeResult([], {
+          rejected: rejectedSoFar,
+          summary: summarizeRun({
+            generated: points.length,
+            rejected: rejectedSoFar,
+            notEvaluated,
+            valid: 0,
+            selected: 0,
+          }),
+        });
+
         return;
       }
 
@@ -107,9 +136,25 @@ export function useCandidateRecommendation(
         return; // superseded by a newer action
       }
 
-      storeResult(
-        selectDistinctCandidates(applyWalkingGate(budgeted, matrix, pharmacies))
+      const { valid, rejected: gateRejections } = partitionWalkingGate(
+        budgeted,
+        matrix,
+        pharmacies
       );
+
+      const allRejected = [...rejectedSoFar, ...gateRejections];
+      const selected = selectDistinctCandidates(valid);
+
+      storeResult(selected, {
+        rejected: allRejected,
+        summary: summarizeRun({
+          generated: points.length,
+          rejected: allRejected,
+          notEvaluated,
+          valid: valid.length,
+          selected: selected.length,
+        }),
+      });
     } catch {
       if (requestId === requestIdRef.current) {
         setError("Candidate search failed. Please try again.");
@@ -125,5 +170,13 @@ export function useCandidateRecommendation(
     setIsLoading(false);
   }
 
-  return { recommendation, isLoading, error, find, clear };
+  return {
+    recommendation,
+    summary,
+    rejected,
+    isLoading,
+    error,
+    find,
+    clear,
+  };
 }

@@ -11,26 +11,9 @@ describe("categories registry", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("stats categories match the six the panel has always shown, in order", () => {
-    const statsIds = CATEGORIES
-      .filter((category) => category.showInStats)
-      .map((category) => category.id);
-
-    expect(statsIds).toEqual([
-      "building",
-      "road",
-      "school",
-      "hospital",
-      "atm",
-      "bus_stop",
-    ]);
-  });
-
-  it("every showInStats entry has a statsLabel", () => {
+  it("every category carries a readable stats label", () => {
     for (const category of CATEGORIES) {
-      if (category.showInStats) {
-        expect(category.statsLabel, category.id).toBeTruthy();
-      }
+      expect(category.statsLabel, category.id).toBeTruthy();
     }
   });
 
@@ -42,7 +25,7 @@ describe("categories registry", () => {
     }
   });
 
-  it("the icon set matches what the map has always shown", () => {
+  it("every category the map draws has an icon", () => {
     const icons = Object.fromEntries(
       CATEGORIES.filter((category) => category.icon).map((category) => [
         category.id,
@@ -56,7 +39,16 @@ describe("categories registry", () => {
       atm: "🏧",
       bus_stop: "🚌",
       pharmacy: "💊",
+      clinic: "✚",
+      university: "🎓",
+      kindergarten: "🧸",
     });
+  });
+
+  it("every category carries a map style", () => {
+    for (const category of CATEGORIES) {
+      expect(category.mapStyle, category.id).toBeTruthy();
+    }
   });
 
   it("getCategory returns null for unknown ids", () => {

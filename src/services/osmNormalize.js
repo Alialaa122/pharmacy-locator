@@ -134,13 +134,46 @@ function normalizeRelation(relation, waysById, nodesById) {
   };
 }
 
+/**
+ * The category of a closed way (an area).
+ *
+ * Precedence: building, then land use, then a SPECIFIC amenity (a
+ * school footprint is a school, not a generic amenity area), and
+ * finally the generic amenity category.
+ */
 function getAreaCategory(tags) {
-  // Precedence = registry order: building before landuse before amenity.
-  const areaCategory = CATEGORIES.find(
-    (category) => category.areaTag && tags[category.areaTag]
+  // Building and land use win over every amenity.
+  for (const category of CATEGORIES) {
+    if (
+      category.areaTag &&
+      category.areaTag !== "amenity" &&
+      tags[category.areaTag]
+    ) {
+      return category.id;
+    }
+  }
+
+  // A specific amenity: the footprint of a school is a school.
+  const amenityCategory = CATEGORIES.find(
+    (category) =>
+      category.amenityValue &&
+      category.areaAmenity &&
+      category.id === tags.amenity
   );
 
-  return areaCategory ? areaCategory.id : "unknown";
+  if (amenityCategory) {
+    return amenityCategory.id;
+  }
+
+  // The generic amenity area.
+  if (tags.amenity) {
+    return (
+      CATEGORIES.find((category) => category.areaTag === "amenity")?.id ??
+      "unknown"
+    );
+  }
+
+  return "unknown";
 }
 
 function getNodeCategory(tags) {

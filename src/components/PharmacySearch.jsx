@@ -66,6 +66,7 @@ function PharmacySearch({
   return (
     <>
       <button
+        className="search-button"
         onClick={handleSearch}
         disabled={!placesLibrary || isLoading || !selectedLocation}
       >
