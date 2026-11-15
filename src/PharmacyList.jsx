@@ -18,7 +18,7 @@ function PharmacyList({
       <h2>Nearby Pharmacies</h2>
 
     {hasSearched && (
-    <button onClick={onClearSearch}>
+    <button className="btn btn-ghost clear-search-button" onClick={onClearSearch}>
         Clear Search
     </button>
     )}

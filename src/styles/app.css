@@ -1,85 +1,359 @@
 /* ==========================================================================
    Map application — shell, panels, cards, markers
-   (Ported from the previously unused src/App.css; the layout rework
-   follows in a later step.)
    ========================================================================== */
 
 .map-app {
-  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   background: var(--bg);
 }
 
-.search-button {
-  background-color: var(--pharmacy);
-  color: white;
-  padding: 12px 24px;
+.map-app .landing-header {
+  flex: none;
+}
+
+/* Shell ------------------------------------------------------------------ */
+
+.app-shell {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--panel-width) minmax(0, 1fr);
+  transition: grid-template-columns 0.2s ease;
+}
+
+.app-shell.is-collapsed {
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.map-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.map-container {
+  height: 100%;
+  width: 100%;
+}
+
+/* Side panel ------------------------------------------------------------- */
+
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+.side-panel.is-collapsed {
+  align-items: center;
+  background: var(--surface);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-tabs {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.panel-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
   border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
   cursor: pointer;
-  transition: background-color 0.2s;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.panel-tab:hover {
+  background: var(--surface-alt);
+  color: var(--text-strong);
+}
+
+.panel-tab.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.tab-badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+}
+
+.panel-tab.is-active .tab-badge {
+  background: #ffffff;
+  color: var(--accent-strong);
+}
+
+.panel-collapse {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.panel-collapse:hover {
+  background: var(--surface-alt);
+  color: var(--text-strong);
+}
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* Search overlay --------------------------------------------------------- */
+
+.search-overlay {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 5;
+  width: 288px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+}
+
+.search-panel-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.field {
+  margin-bottom: 12px;
+}
+
+.field label,
+.field-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.field select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-strong);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.location-readout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.location-readout .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pharmacy);
+  flex: none;
+}
+
+.location-readout.is-empty {
+  background: transparent;
+  padding-left: 0;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+/* Search button ---------------------------------------------------------- */
+
+.search-button {
+  width: 100%;
+  padding: 11px 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--pharmacy);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
 .search-button:hover:not(:disabled) {
-  background-color: var(--pharmacy-strong);
+  background: var(--pharmacy-strong);
 }
 
 .search-button:disabled {
-  background-color: var(--text-muted);
+  background: var(--text-muted);
   cursor: not-allowed;
 }
 
 .error-message {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
   color: var(--danger);
-  font-size: 14px;
-  margin-top: 10px;
+  font-size: 13px;
 }
 
-.selected-location-marker {
-  font-size: 60px;
-  cursor: pointer;
+/* Panels ----------------------------------------------------------------- */
+
+.panel-body h2 {
+  font-size: 15px;
+  margin-bottom: 12px;
 }
 
-.map-layout {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-  margin-top: 20px;
+.panel-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.6;
 }
 
-.map-container {
-  flex: 2;
-  min-width: 0;
-}
+/* Pharmacy results ------------------------------------------------------- */
 
-.pharmacy-list {
-  flex: 1;
-  min-width: 280px;
-  max-height: 600px;
-  overflow-y: auto;
+.search-summary {
   padding: 12px;
-  background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  font-size: 13px;
+  color: var(--text);
 }
+
+.search-summary p + p {
+  margin-top: 4px;
+}
+
+.search-summary strong {
+  color: var(--text-strong);
+}
+
+.clear-search-button {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.pharmacy-card {
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--pharmacy);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.pharmacy-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.pharmacy-card.is-selected {
+  border-color: var(--pharmacy);
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.18);
+}
+
+.pharmacy-card h3 {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.pharmacy-card p {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.pharmacy-distances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 8px;
+}
+
+.pharmacy-distances p {
+  font-size: 12px;
+}
+
+/* Verdict ---------------------------------------------------------------- */
 
 .location-verdict {
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
 }
 
 .location-verdict h2 {
-  font-size: 14px;
-  margin: 0 0 8px;
-  color: #1e293b;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
 }
 
 .verdict-badge {
   display: inline-block;
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 999px;
   color: #ffffff;
   font-size: 12px;
@@ -87,245 +361,218 @@
 }
 
 .location-verdict p {
-  font-size: 12px;
-  line-height: 1.4;
-  color: #64748b;
-  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+  margin-top: 8px;
 }
 
 .location-verdict strong {
-  color: #15803d;
+  color: var(--text-strong);
 }
 
 .verdict-reason {
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .location-verdict small {
   display: block;
-  font-size: 11px;
-  color: #94a3b8;
-  margin-top: 6px;
+  margin-top: 8px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
-.pharmacy-card {
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
-}
-
-.pharmacy-card:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
-}
-
-.pharmacy-card h3 {
-  font-size: 14px;
-  margin: 0 0 5px;
-  color: #1e293b;
-}
-
-.pharmacy-card p {
-  font-size: 12px;
-  line-height: 1.4;
-  color: #64748b;
-  margin: 0 0 8px;
-}
-
-.pharmacy-card strong {
-  font-size: 13px;
-  color: #15803d;
-}
-
-.pharmacy-card small {
-  display: block;
-  font-size: 11px;
-  color: #94a3b8;
-  margin-top: 2px;
-}
-
-.candidates-panel {
-  flex: 1;
-  min-width: 280px;
-  max-height: 600px;
-  overflow-y: auto;
-  padding: 12px;
-  background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-}
-
-.candidates-panel h2 {
-  font-size: 14px;
-  margin: 0 0 8px;
-  color: #1e293b;
-}
+/* Candidates ------------------------------------------------------------- */
 
 .recommend-button {
   width: 100%;
-  background-color: #1e293b;
-  color: white;
-  padding: 10px 16px;
+  padding: 11px 16px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius);
+  background: var(--candidate);
+  color: #ffffff;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 650;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background-color 0.2s ease;
 }
 
 .recommend-button:hover:not(:disabled) {
-  background-color: #0f172a;
+  background: var(--accent-strong);
 }
 
 .recommend-button:disabled {
-  background-color: #9ca3af;
+  background: var(--text-muted);
   cursor: not-allowed;
 }
 
 .candidates-note {
-  font-size: 11px;
-  line-height: 1.4;
-  color: #94a3b8;
-  margin: 8px 0 12px;
+  margin: 10px 0 14px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
 }
 
 .candidates-empty {
-  font-size: 12px;
-  line-height: 1.4;
-  color: #64748b;
-  margin: 8px 0;
+  padding: 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .candidate-card {
-  padding: 10px 12px;
+  padding: 12px 14px;
   margin-bottom: 8px;
-  border: 1px solid #e5e7eb;
-  border-left-width: 4px;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--candidate);
+  border-radius: var(--radius);
+  background: var(--surface);
   cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .candidate-card:hover {
-  background: #f8fafc;
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .candidate-card.candidate-selected {
-  background: #f1f5f9;
-  box-shadow: 0 0 0 2px rgba(30, 41, 59, 0.25);
-}
-
-/* Content of the candidate InfoWindow */
-.candidate-window h3 {
-  font-size: 14px;
-  margin: 0 0 6px;
-  color: #1e293b;
-  max-width: 220px;
-}
-
-.candidate-window p {
-  font-size: 12px;
-  line-height: 1.4;
-  color: #64748b;
-  margin: 0 0 4px;
-}
-
-.candidate-window strong {
-  color: #15803d;
-}
-
-.candidate-window small {
-  display: block;
-  font-size: 11px;
-  color: #94a3b8;
-  margin-top: 4px;
+  border-color: var(--candidate);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.18);
 }
 
 .candidate-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 
 .candidate-rank {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background-color: #16a34a;
+  background: var(--candidate);
   color: #ffffff;
   font-size: 11px;
   font-weight: 700;
-  flex-shrink: 0;
+  flex: none;
 }
 
 .candidate-header h3 {
   font-size: 14px;
   margin: 0;
-  color: #1e293b;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .candidate-kind {
-  font-size: 11px;
-  color: #94a3b8;
-  margin: 0 0 6px;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  color: var(--text-muted);
 }
 
 .candidate-card p {
-  font-size: 12px;
-  line-height: 1.4;
-  color: #64748b;
-  margin: 0 0 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
 }
 
 .candidate-card strong {
-  font-size: 12px;
-  color: #15803d;
+  color: var(--text-strong);
 }
 
 .clear-recommendation {
   width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   background: none;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 6px;
-  font-size: 12px;
-  color: #64748b;
+  color: var(--text);
+  font-size: 12.5px;
   cursor: pointer;
-  margin-top: 4px;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 
 .clear-recommendation:hover {
-  border-color: #94a3b8;
-  color: #1e293b;
+  border-color: var(--border-strong);
+  color: var(--text-strong);
 }
 
-/* Map marker pin for recommended candidate spots */
+/* Geographic analysis ---------------------------------------------------- */
+
+.analysis-hint {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.stat-row:last-child {
+  border-bottom: none;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.stat-count {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Map markers ------------------------------------------------------------ */
+
+.selected-location-marker {
+  font-size: 42px;
+  line-height: 1;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 3px rgba(15, 23, 42, 0.35));
+}
+
+.geographic-marker {
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .candidate-marker {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background-color: #16a34a;
+  background: var(--candidate);
   color: #ffffff;
   font-size: 13px;
   font-weight: 700;
   border: 2px solid #ffffff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.35);
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .candidate-marker:hover {
@@ -333,26 +580,66 @@
 }
 
 .candidate-marker.candidate-selected {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
   transform: scale(1.12);
-  box-shadow: 0 0 0 3px rgba(30, 41, 59, 0.4), 0 1px 4px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.35),
+    0 2px 6px rgba(15, 23, 42, 0.35);
 }
 
-.geographic-marker {
-  font-size: 22px;
-  cursor: pointer;
+/* Info windows ----------------------------------------------------------- */
+
+.pharmacy-window h3,
+.candidate-window h3 {
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: var(--text-strong);
+  max-width: 220px;
 }
 
-@media (max-width: 768px) {
-  .map-layout {
-    flex-direction: column;
+.pharmacy-window p,
+.candidate-window p {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.pharmacy-window small,
+.candidate-window small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* Responsive ------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .app-shell,
+  .app-shell.is-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 55vh minmax(0, 1fr);
   }
 
-  .map-container,
-  .pharmacy-list,
-  .candidates-panel {
-    width: 100%;
-    box-sizing: border-box;
+  .app-shell.is-collapsed {
+    grid-template-rows: 55vh minmax(0, 1fr);
+  }
+
+  .side-panel {
+    border-right: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .side-panel.is-collapsed {
+    display: none;
+  }
+
+  .search-overlay {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    width: auto;
   }
 }
