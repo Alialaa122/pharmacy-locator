@@ -17,14 +17,15 @@
 | 8 | Cleanup pass | ✅ Done | `ed9cbde`, `34f72be` | service split (osmService/osmNormalize), logs + dead code removed, lint fully clean |
 | 9 | City selector feature | ✅ Done | `77bc1de` (feature/city-selector) | Alexandria/Cairo/Matrouh; CityMapMover; SearchPanel split |
 | 10 | Eligibility evaluator (EDA rule) | ✅ Done | `7881c7e` merged `6acbd22` | `domain/eligibility.js` + `LocationVerdict`; walking-distance-based bands; Unverified semantics |
-| 11 | Geographic candidate finder | ✅ Done (on `feature/candidate-recommendation`, pending browser verification + merge) | `cab5828`, `5080d99` | grid point generation, 15 m road exclusion, WALKING ≥ 100 m validity gate, top-3 mutually distinct candidates; replaced the earlier OSM-site recommender |
+| 11 | Geographic candidate finder | ✅ Done | `cab5828` merged `298c264` | grid point generation, 15 m road exclusion, WALKING ≥ 100 m validity gate, top-3 mutually distinct candidates; replaced the earlier OSM-site recommender |
 
 **Tests: 85 passing** (8 files: osmNormalize, geo, format, pharmacyResults, categories, cities, eligibility, candidates)
 **Lint: completely clean** (as of step 8)
 
 Refactor steps 1–8 merged to main (`853bdd2`). Step 9 (city selector) merged
 to main (`007eaef`). Step 10 (eligibility evaluator) merged to main (`6acbd22`).
-Step 11 on `feature/candidate-recommendation` (planned, approved, implemented):
+Step 11 (geographic candidate finder) merged to main (`298c264`);
+planned, approved, implemented on `feature/candidate-recommendation`:
 - Planning: the feature was re-planned as the Geographic Candidate Finder
   (geometric sampling, not OSM-derived sites); all open questions approved
   (grid spacing radius/4, 15 m road tolerance, strict walking-gate
@@ -59,10 +60,10 @@ Step 11 on `feature/candidate-recommendation` (planned, approved, implemented):
   gray Unverified badge with a reason). Merged to main (`6acbd22`).
 - **Step 11:** browser check by the user: search → "Search for locations"
   → up to 3 mutually distinct valid spots, none on roads, each ≥ 100 m
-  walking from every pharmacy. Clicking a candidate crashed the app on a
-  TDZ bug — `selectedCandidateIndex` was derived BEFORE the hook declared
-  `recommendation` (a latent bug from the clickable-spots commit); fixed in
-  `1c85b6f`, re-check click + InfoWindow before merging.
+  walking from every pharmacy; candidate click + InfoWindow work after a
+  TDZ fix — `selectedCandidateIndex` was derived BEFORE the hook declared
+  `recommendation` (a latent bug from the clickable-spots commit); fixed
+  in `1c85b6f` and re-verified by the user. Merged to main (`298c264`).
 
 ## Behavior changes so far (all agreed, documented in ARCHITECTURE.md §6/§8)
 
