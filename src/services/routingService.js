@@ -1,10 +1,12 @@
 const VALHALLA_URL =
   "https://valhalla1.openstreetmap.de/sources_to_targets";
 
-// The Valhalla service caps a matrix call at 100 locations in total
-// (sources + targets). Our callers send ≤ 10 sources, so we chunk the
-// targets to stay under the cap and merge the rows back into one matrix.
-const VALHALLA_MAX_LOCATIONS = 100;
+// The Valhalla service caps a matrix call at 100 CELLS, i.e.
+// sources.length x targets.length <= 100 (probed live: 1x100/10x10/
+// 20x5 → 200; 1x101/10x11/10x20 → 400 "Exceeded max locations").
+// We chunk the TARGETS to stay under the cap and merge the rows back
+// into one matrix.
+const VALHALLA_MAX_CELLS = 100;
 
 /**
  * Walking distance/time matrix from many sources to many targets, via
@@ -18,10 +20,14 @@ const VALHALLA_MAX_LOCATIONS = 100;
  *   `matrix[s][t]` is index-matched to sources and targets; null = no route.
  */
 export async function getWalkingMatrix(sources, targets) {
-  const maxTargetsPerRequest =
-    VALHALLA_MAX_LOCATIONS - sources.length;
-  // maxTargetsPerRequest is ≥ 1 as long as sources length is < 100,
-  // which holds for every caller of this app.
+  // With 10 sources (the recommender's MAX_CERTIFY budget) each chunk
+  // carries ≤ 10 targets — at most 2 requests for the full pharmacy
+  // list. With 1 source (the pharmacy search pipeline) it's one
+  // request up to 100 targets.
+  const maxTargetsPerRequest = Math.max(
+    1,
+    Math.floor(VALHALLA_MAX_CELLS / sources.length)
+  );
 
   const matrix = sources.map(() => new Array(targets.length).fill(null));
 

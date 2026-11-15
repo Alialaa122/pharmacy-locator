@@ -263,7 +263,10 @@ function App() {
         />
         <CandidatesPanel
           canRecommend={
-            hasSearched && pharmacies.length > 0 && !geographicError
+            hasSearched &&
+            pharmacies.length > 0 &&
+            !geographicError &&
+            !isGeographicLoading
           }
           recommendation={recommendation}
           isLoading={isRecommending}
