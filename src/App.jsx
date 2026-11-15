@@ -10,9 +10,12 @@ import {
 import PharmacyList from "./PharmacyList.jsx";
 import GeographicAnalysis from "./GeographicAnalysis.jsx";
 import SearchPanel from "./components/SearchPanel.jsx";
+import CandidatesPanel from "./components/CandidatesPanel.jsx";
 import OsmLayer from "./components/map/OsmLayer.jsx";
 import CityMapMover from "./components/map/CityMapMover.jsx";
+import CandidateMarkers from "./components/map/CandidateMarkers.jsx";
 import { useGeographicFeatures } from "./hooks/useGeographicFeatures.js";
+import { useCandidateRecommendation } from "./hooks/useCandidateRecommendation.js";
 import { CATEGORIES } from "./lib/categories.js";
 import { DEFAULT_CITY } from "./lib/cities.js";
 import { formatDistance } from "./lib/format.js";
@@ -50,12 +53,30 @@ function App() {
   const [selectedCity, setSelectedCity] = useState(DEFAULT_CITY);
   const [searchRadius, setSearchRadius] = useState(1000);
   const [hasSearched, setHasSearched] = useState(false);
+  // { forRecommendation, index } — bound to the exact recommendation
+  // array it came from, so a new search / new recommendation (a new
+  // array reference) invalidates the selection automatically — no
+  // stale InfoWindow, no effect (derived state, as in the hook).
+  const [candidateSelection, setCandidateSelection] = useState(null);
 
   const {
     features: geographicFeatures,
     isLoading: isGeographicLoading,
     error: geographicError,
   } = useGeographicFeatures(selectedLocation, searchRadius);
+
+  const {
+    recommendation,
+    isLoading: isFinding,
+    error: findError,
+    find,
+    clear: clearRecommendation,
+  } = useCandidateRecommendation(
+    selectedLocation,
+    searchRadius,
+    geographicFeatures,
+    pharmacies
+  );
 
   const geographicStats = CATEGORIES.filter(
     (category) => category.showInStats
@@ -69,10 +90,41 @@ function App() {
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
+  // A selected candidate is an index into the CURRENT recommendation.
+  // A new search / clear invalidates the recommendation (reference
+  // mismatch), so it also invalidates this selection — no stale window.
+  // Derived AFTER the hooks: `recommendation` is declared by the hook
+  // call above, so this must not run before it (TDZ).
+  const selectedCandidateIndex =
+    candidateSelection && candidateSelection.forRecommendation === recommendation
+      ? candidateSelection.index
+      : null;
+
+  const selectedCandidate =
+    recommendation && selectedCandidateIndex !== null
+      ? recommendation[selectedCandidateIndex]
+      : null;
+
   function handleClearSearch() {
     setPharmacies([]);
     setSelectedPharmacy(null);
     setHasSearched(false);
+    setCandidateSelection(null);
+    clearRecommendation();
+  }
+
+  function handleSelectCandidate(index) {
+    setSelectedPharmacy(null); // one info-window at a time
+    setCandidateSelection({ forRecommendation: recommendation, index });
+  }
+
+  function handleCloseCandidate() {
+    setCandidateSelection(null);
+  }
+
+  function handleClearRecommendation() {
+    setCandidateSelection(null);
+    clearRecommendation();
   }
 
   function handleLocationSelect(location) {
@@ -105,7 +157,7 @@ function App() {
           style={{ width: "100%", height: "600px" }}
         >
           <CityMapMover selectedCity={selectedCity} />
-          {selectedPharmacy && (
+          {selectedPharmacy && !selectedCandidate && (
             <InfoWindow
               position={{
                 lat: selectedPharmacy.lat,
@@ -157,6 +209,41 @@ function App() {
               onClick={() => setSelectedPharmacy(pharmacy)}
             />
         ))}
+          {selectedCandidate && (
+            <InfoWindow
+              position={{
+                lat: selectedCandidate.lat,
+                lng: selectedCandidate.lng,
+              }}
+              onCloseClick={handleCloseCandidate}
+            >
+              <div className="candidate-window">
+                <h3>
+                  {recommendation.indexOf(selectedCandidate) + 1}.{" "}
+                  Candidate spot
+                </h3>
+                <p>
+                  Walking distance to nearest competitor:{" "}
+                  {formatDistance(
+                    selectedCandidate.walkingSeparationMeters
+                  )}
+                </p>
+                <p>
+                  Nearest competitor:{" "}
+                  {selectedCandidate.nearestPharmacyName}
+                </p>
+                <small>
+                  {selectedCandidate.lat.toFixed(5)},{" "}
+                  {selectedCandidate.lng.toFixed(5)}
+                </small>
+              </div>
+            </InfoWindow>
+          )}
+          <CandidateMarkers
+            recommendation={recommendation}
+            selectedCandidateIndex={selectedCandidateIndex}
+            onSelectCandidate={handleSelectCandidate}
+          />
         </GoogleMap>
         </div>
         <PharmacyList
@@ -165,6 +252,21 @@ function App() {
           searchRadius={searchRadius}
           hasSearched={hasSearched}
           onClearSearch={handleClearSearch}
+        />
+        <CandidatesPanel
+          canRecommend={
+            hasSearched &&
+            pharmacies.length > 0 &&
+            !geographicError &&
+            !isGeographicLoading
+          }
+          recommendation={recommendation}
+          isLoading={isFinding}
+          error={findError}
+          selectedCandidateIndex={selectedCandidateIndex}
+          onFind={find}
+          onClear={handleClearRecommendation}
+          onSelectCandidate={handleSelectCandidate}
         />
         <GeographicAnalysis
             stats={geographicStats}

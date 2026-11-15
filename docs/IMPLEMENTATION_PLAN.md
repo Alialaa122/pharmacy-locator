@@ -87,6 +87,33 @@ Nothing else changes in this step.
   remain separate; no auto-search on city selection.
 - Sanity-check Matrouh's coordinates/zoom on first run.
 
+### Step 10 — Feature: eligibility evaluator (EDA rule) ✅
+Branch `feature/eligibility-evaluator`, merged to main (`6acbd22`).
+`domain/eligibility.js` (pure `classifySeparation`, `findNearestPharmacy`,
+`evaluateLocation`; `LocationVerdict` band + Unverified semantics) + UI card.
+
+### Step 11 — Feature: candidate recommendation (logic only) 🚧
+Branch `feature/candidate-recommendation`. Full spec: `ARCHITECTURE.md` §9.
+Auto-generated candidates (Option B), deterministic, no AI. Commits:
+
+1. **Docs** — `ARCHITECTURE.md` §9 + §8 decision + step rows;
+   `IMPLEMENTATION_PLAN.md` step 11; `PROGRESS.md` row.
+2. **`routingService.getWalkingMatrix(sources, targets)`** — multi-source
+   Valhalla `sources_to_targets` call returning a `matrix[s][t]` of
+   `{ distanceMeters, durationSeconds } | null`; refactor
+   `getWalkingRoutes()` to a thin wrapper so its existing tests stay green.
+3. **`lib/geo.js`** — add `polygonCentroid(ring)` and `lineMidpoint(coords)`
+   (pure, meters-safe coordinate math on GeoJSON `[lon, lat]`).
+4. **`domain/candidates.js`** (pure) — `buildCandidateSites(features)`,
+   `prefilterCandidates(sites, pharmacies)` (100 m straight-line hard gate,
+   margin-first, top-10 cap), `rankCandidates(sites, matrix)` (walking
+   separation, `classifySeparation` reuse, top-3). Plus
+   `recommendLocations(features, pharmacies, matrix)` orchestrating 1–3.
+   Tests pin every edge case in `ARCHITECTURE.md` §9.
+
+**Explicit non-goal for this step:** no UI — no button, panel, or markers.
+The recommender UI is a follow-up feature to be planned separately.
+
 ### Merge
 When steps 6–8 are verified, merge `architecture/refactor` into `main`
 (PR preferred). Step 9 may also land on the branch or on main afterwards —

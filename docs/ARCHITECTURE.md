@@ -1,9 +1,10 @@
 # Architecture — Pharmacy Locator
 
 > **Status:** prototype (`prototype-v1` tag). Client-only application: no backend, no database,
-> no server-side rendering. All refactoring steps 1–10 of the implementation plan are done
-> and merged to main (see `docs/IMPLEMENTATION_PLAN.md` / `docs/PROGRESS.md`); the
-> "Current Architecture" below describes the post-refactor state.
+> no server-side rendering. Steps 1–11 of the implementation plan are done
+> (step 11 = the Geographic Candidate Finder, which replaced the earlier
+> OSM-site recommender — see `docs/PROGRESS.md`).
+> The "Current Architecture" below describes the post-refactor state.
 
 ## 1. Current Architecture (as implemented after the refactor)
 
@@ -31,7 +32,7 @@ with unit-suffixed field names; all display formatting lives in `lib/format.js`;
 lint is clean and the test suite pins normalizer, assembler, and formatter
 behavior.
 
-## 2. Target Architecture (agreed — steps 1–8 implemented; step 9 pending)
+## 2. Target Architecture (agreed — steps 1–10 implemented; step 11 in flight)
 
 ```
 UI components ──▶ hooks ──▶ domain (pure) ──▶ services ──▶ external APIs
@@ -41,7 +42,8 @@ UI components ──▶ hooks ──▶ domain (pure) ──▶ services ──�
 ```
 src/
 ├── lib/        geo.js · format.js · categories.js · cities.js
-├── domain/     pharmacyResults.js            (pure result assembly)
+├── domain/     pharmacyResults.js · candidates.js
+│                     (pure result assembly · pure recommendation ranking)
 ├── services/   placesService · routingService · osmService · osmNormalize
 ├── hooks/      useGeographicFeatures · usePharmacySearch
 ├── components/ map/(MapCanvas · OsmLayer · PharmacyMarkers)
@@ -184,9 +186,22 @@ Not tested now: React components, network calls.
   verdict is derived from the result list (no new state, no API calls). Geometric fact
   the design relies on: walking ≥ straight-line, so straight-line ≥ 100 m guarantees the
   gate passes — useful later for cheap candidate prefiltering in the recommender.
-- **Recommender direction:** a deterministic (non-AI) recommender will be built on top of
-  the evaluator as its own future feature; an LLM-assisted recommender is a longer-term
-  goal that would consume the evaluator's structured output — explicit non-goal for now.
+- **Finder direction:** a deterministic (non-AI) location finder, no
+  commercial factors at all (no demand, density, foot-traffic, price);
+  results are "valid spots", not ranked "better/worse" spots; an
+  LLM-assisted recommender remains a longer-term goal outside this
+  prototype.
+- **Candidate finder (step 11, re-planned and agreed):** candidates
+  are geometric points on a deterministic grid inside the user-selected
+  radius (5×5, spacing = radius/4). Two hard constraints, WALKING
+  PRIORITY: (a) walking ≥ 100 m from every pharmacy is the
+  authoritative validity gate — any unresolved route invalidates the
+  candidate; (b) not on a road (road centerline within 15 m rejects;
+  proximity is fine). Straight-line < 100 m is a rejection-only
+  prefilter (sound by walking ≥ straight-line; it never accepts).
+  Top 3 results are mutually ≥ 200 m apart (greedy scan order).
+  Valhalla failure = distinct error (nothing certifiable); never a
+  degraded straight-line fallback.
 - **Order: refactor first, new features after** (city selector is the first feature post-refactor).
 
 **Implementation order (each step = one commit, following the AGENTS.md workflow loop):**
@@ -200,6 +215,120 @@ Not tested now: React components, network calls.
 7. Category registry.
 8. Cleanup pass (dead code, debug logs, grid search deletion).
 9. Feature: city selector (Alexandria / Cairo / Matrouh).
+10. Feature: eligibility evaluator (`domain/eligibility.js`).
+11. Feature: geographic candidate finder (see §9 below).
 
-No open decisions remain. Coordinate/zoom values of `lib/cities.js` are sanity-checked on
-first run.
+No open decisions remain for the agreed scope. Coordinate/zoom values of
+`lib/cities.js` are sanity-checked on first run. The candidate finder
+ships with a minimal UI for verification (see §9); a richer finder UI
+(filters, per-constraint detail views, export) is a deliberate
+follow-up feature.
+
+## 9. Geographic Candidate Finder (step 11)
+
+The finder proposes **up to 3** spots inside the user-selected radius
+where a new pharmacy would satisfy the two agreed constraints. It is
+deterministic — no randomness, no AI, and no commercial ranking
+(no demand, density, foot-traffic, or price factors; the prototype
+uses no such data, and the UI makes no "better/worse" claims between
+the results).
+
+**The two constraints — walking has absolute priority:**
+
+1. **Walking ≥ 100 m from every existing pharmacy** — the
+   *authoritative* rule. A candidate is valid only if Valhalla resolves
+   a route to EVERY pharmacy and the minimum walking distance is ≥
+   100 m. No other measurement can substitute for it. (The 100 m
+   measure is a product assumption for this prototype, pending
+   separate regulatory verification.)
+2. **Not on a road** — a secondary hard filter: a candidate fails if
+   any OSM road centerline is within **15 m**. Proximity beyond the
+   tolerance is fine. Roads come from the *existing* Overpass fetch
+   (no extra request); all `highway=*` LineStrings count.
+
+**Pipeline** (cheapest-first — the evaluation order is an efficiency
+detail; the walking rule always has the final say):
+
+```
+location + radius + features + pharmacies
+  1. generateCandidatePoints(location, radius)        (pure)
+        deterministic 5x5 square grid, spacing = radius/4,
+        clipped to the circle (~25 points, radius-independent
+        count); stable ids; constant point count keeps API
+        volume stable
+  2. filterOffRoad(points, roadFeatures)              (pure)
+        reject if ANY road centerline < 15 m
+        (lib/geo.distanceToPolylineMeters — planar
+         point-to-segment, meters)
+  3. filterFarEnough(points, pharmacies)              (pure)
+        REJECTION-ONLY straight-line prefilter: reject if
+        straight-line < 100 m to ANY pharmacy. Sound by
+        walking >= straight-line: it can never wrongly reject,
+        and it never ACCEPTS anyone — nothing passing here
+        is certified yet
+  4. budgetCandidates(survivors)                      (pure)
+        cap at 20 by straight-line margin (descending) —
+        pure request-budget bookkeeping, no ranking claim
+  5. routingService.getWalkingMatrix(budgeted, pharmacies)
+        reused unchanged (services layer caps each request at
+        100 CELLS — sources x targets <= 100, proven live;
+        chunks targets and merges the matrix). Worst case is
+        20x20 = 400 cells -> 4 requests
+  6. applyWalkingGate(budgeted, matrix, pharmacies)   (pure)
+        THE WALKING RULE: every cell must resolve and the row's
+        minimum must be >= 100 m. ANY missing route => the
+        candidate is INVALID (an uncalculated distance is
+        never assumed valid); a failed routing call (empty
+        matrix) certifies nothing
+  7. selectDistinctCandidates(valid, 3, 200)          (pure)
+        greedy scan order: pick a candidate only >= 200 m from
+        every already-picked one; stop at 3; return what
+        exists (0-3), never pad
+```
+
+**Edge cases** (all pinned by tests):
+
+| Case | Expected behavior |
+|---|---|
+| Fewer than 3 valid candidates | Return what exists (0-3). |
+| No pharmacies found | Button disabled — the compliance check is vacuous (button requires >= 1 pharmacy, as before). |
+| No road features in radius | Road filter passes everything — not an error. |
+| Valhalla request fails (fetch throws) | **Distinct error state** ("candidates could not be verified") — never presented as an empty result. The walking rule is authoritative; nothing can be certified without it. |
+| Individual route missing (null cell) | That candidate is rejected; others are unaffected. |
+| All points fail the road check or the straight-line prefilter | Zero candidates: no valid spots in this radius (message shown). |
+| New search / Clear Search | Existing reference-invalidation clears any previous result automatically. |
+
+**UI (implemented):**
+- `hooks/useCandidateRecommendation(location, radius, features,
+  pharmacies)` — owns the orchestration (generate -> off-road ->
+  straight-line prefilter -> budget -> Valhalla matrix -> walking
+  gate -> distinct selection) and request state; keeps the
+  reference-invalidation against the current pharmacy array and the
+  request-id supersede guard from the recommender.
+- `components/CandidatesPanel` — display-only: "Search for
+  locations" button (enabled after a search found >= 1 pharmacy and
+  the Overpass layer has loaded), up to 3 cards (neutral rank badge,
+  the verified fact: walking distance to the nearest competitor and
+  its name), the empty-state message, the routing-failure error, and
+  a clear button.
+- `components/map/CandidateMarkers` — numbered neutral
+  `AdvancedMarker`s; all `@vis.gl` usage stays in `components/map/`.
+- `App.jsx` wires hook + panel + markers + per-spot InfoWindow;
+  plain candidate array down, callbacks up.
+
+**Behavior changes from the earlier OSM-site recommender (all
+agreed):** candidates are geometric grid points, not OSM-derived
+centroids/midpoints (which could land ON roads — hence the new
+road-exclusion constraint); the walking rule is now a hard VALIDITY
+gate, not a band certification — advisory bands, margin-ranking,
+`walkingVerified: false` fallbacks, and OSM-site labeling are all
+removed; routing failure now surfaces as a distinct error instead
+of a degraded straight-line result. `domain/eligibility.js`
+(clicked-location verdict) is untouched and independent.
+
+**Accepted limitations:** candidates are geometric points, best-
+effort "this spot", not a legal address or door position; the
+15 m road tolerance is a prototype constant (a `highway` class
+filter is a follow-up if it over-rejects); the 100 m walking rule
+is a product assumption, pending regulatory verification.
+
